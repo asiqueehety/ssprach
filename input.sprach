@@ -1,0 +1,33 @@
+GANZ x = 10;
+KOMM y = 3.5;
+TEXT msg = "Hallo Welt";
+
+wenn (x > 5) {
+    geben msg;
+}
+sonst {
+    geben "Kleinere Zahl";
+}
+
+fur (GANZ i = 0; i < x; i = i + 1) {
+    geben i;
+}
+
+waehrend (x > 0) {
+    x = x - 1;
+}
+
+
+TEXT namen[];
+namen hinzufuegen "Anna";
+namen hinzufuegen "Max";
+namen sortieren;
+namen entfernen;
+
+#Comments
+
+KOMM r = quadrat_wurzel(16.0);
+KOMM s = mathe_sin(30.0);
+
+geben r;
+geben s;
