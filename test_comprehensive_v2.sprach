@@ -1,0 +1,257 @@
+# SPRACH Comprehensive Test (v2)
+# Removing unsupported features: WAHL, string arrays, advanced math
+
+geben 999;
+
+# ============================================================
+# 1. DATA TYPES & VARIABLES
+# ============================================================
+GANZ intVar = 42;
+KOMM doubleVar = 3;
+TEXT stringVar = "Hello SPRACH";
+ZEICHEN charVar = 'X';
+
+geben intVar;
+geben doubleVar;
+geben stringVar;
+geben charVar;
+
+# ============================================================
+# 2. ARITHMETIC OPERATIONS
+# ============================================================
+geben 10 + 5;
+geben 20 - 8;
+geben 6 * 7;
+geben 20 / 4;
+geben 17 % 5;
+geben 2 ^ 3;
+geben 2 + 3 * 4;
+geben (2 + 3) * 4;
+geben -5 + 10;
+geben -(3 + 2);
+
+# ============================================================
+# 3. COMPARISON OPERATORS
+# ============================================================
+geben 5 == 5;
+geben 5 == 3;
+geben 5 != 3;
+geben 5 < 10;
+geben 5 <= 5;
+geben 5 > 3;
+geben 5 >= 5;
+
+# ============================================================
+# 4. LOGICAL OPERATORS
+# ============================================================
+geben 1 und 1;
+geben 1 und 0;
+geben 0 oder 1;
+geben 0 oder 0;
+geben nicht 1;
+geben nicht 0;
+geben (1 und 1) oder 0;
+
+# ============================================================
+# 5. BITWISE OPERATORS
+# ============================================================
+geben 5 & 3;
+geben 5 | 3;
+geben 5 << 1;
+geben 8 >> 1;
+
+# ============================================================
+# 6. VARIABLE ASSIGNMENT
+# ============================================================
+GANZ x = 5;
+x = 10;
+geben x;
+
+GANZ y = 20;
+y = y + 5;
+geben y;
+
+GANZ Name = 100;
+GANZ name = 200;
+geben Name;
+geben name;
+
+# ============================================================
+# 7. IF-ELSE STATEMENTS
+# ============================================================
+GANZ testNum = 15;
+
+wenn (testNum > 10) {
+    geben 1;
+} sonst {
+    geben 0;
+}
+
+wenn (testNum < 10) {
+    geben 0;
+} sonst {
+    geben 2;
+}
+
+GANZ score = 75;
+wenn (score >= 90) {
+    geben 1;
+} sonst wenn (score >= 80) {
+    geben 2;
+} sonst wenn (score >= 70) {
+    geben 3;
+} sonst {
+    geben 4;
+}
+
+GANZ a = 5;
+GANZ b = 10;
+wenn (a < b) {
+    wenn (a > 0) {
+        geben 1;
+    }
+}
+
+# ============================================================
+# 8. WHILE LOOPS
+# ============================================================
+GANZ counter = 0;
+waehrend (counter < 5) {
+    geben counter;
+    counter = counter + 1;
+}
+
+GANZ sum = 0;
+GANZ i = 1;
+waehrend (i <= 5) {
+    sum = sum + i;
+    i = i + 1;
+}
+geben sum;
+
+# ============================================================
+# 9. FOR LOOPS
+# ============================================================
+fuer (j = 0; j < 5; j = j + 1) {
+    geben j;
+}
+
+fuer (k = 0; k < 10; k = k + 2) {
+    geben k;
+}
+
+fuer (row = 1; row <= 3; row = row + 1) {
+    fuer (col = 1; col <= 3; col = col + 1) {
+        geben row * col;
+    }
+}
+
+# ============================================================
+# 10. ARRAYS
+# ============================================================
+GANZ numbers[] = {10, 20, 30, 40, 50};
+geben numbers[0];
+geben numbers[2];
+geben numbers[4];
+
+fuer (idx = 0; idx < 5; idx = idx + 1) {
+    geben numbers[idx];
+}
+
+KOMM decimals[] = {1, 2, 3, 4};
+geben decimals[0];
+geben decimals[2];
+
+# ============================================================
+# 11. COMPLEX EXPRESSIONS
+# ============================================================
+geben (5 + 3) * 2 - 1;
+geben 10 / 2 + 3 * 4;
+geben (10 + 5) * (3 - 1);
+
+# ============================================================
+# 12. FIBONACCI SEQUENCE (10 numbers)
+# ============================================================
+GANZ fib_a = 0;
+GANZ fib_b = 1;
+GANZ fib_count = 0;
+
+waehrend (fib_count < 10) {
+    geben fib_a;
+    GANZ fib_temp = fib_a + fib_b;
+    fib_a = fib_b;
+    fib_b = fib_temp;
+    fib_count = fib_count + 1;
+}
+
+# ============================================================
+# 13. FACTORIAL CALCULATION (5!)
+# ============================================================
+GANZ factorial = 1;
+GANZ fact_n = 5;
+fuer (fact_i = 1; fact_i <= fact_n; fact_i = fact_i + 1) {
+    factorial = factorial * fact_i;
+}
+geben factorial;
+
+# ============================================================
+# 14. SUM OF ARRAY
+# ============================================================
+GANZ array[] = {5, 10, 15, 20, 25};
+GANZ array_sum = 0;
+GANZ array_idx = 0;
+
+waehrend (array_idx < 5) {
+    array_sum = array_sum + array[array_idx];
+    array_idx = array_idx + 1;
+}
+geben array_sum;
+
+# ============================================================
+# 15. FIND MAXIMUM IN ARRAY
+# ============================================================
+GANZ values[] = {3, 7, 2, 9, 1, 5};
+GANZ max_val = values[0];
+GANZ max_idx = 1;
+
+waehrend (max_idx < 6) {
+    wenn (values[max_idx] > max_val) {
+        max_val = values[max_idx];
+    }
+    max_idx = max_idx + 1;
+}
+geben max_val;
+
+# ============================================================
+# 16. NESTED LOOPS WITH CONDITIONS
+# ============================================================
+fuer (outer = 1; outer <= 3; outer = outer + 1) {
+    fuer (inner = 1; inner <= 3; inner = inner + 1) {
+        wenn (outer == inner) {
+            geben 1;
+        } sonst {
+            geben 0;
+        }
+    }
+}
+
+# ============================================================
+# 17. COMBINED OPERATORS
+# ============================================================
+geben (5 + 3) und (2 > 1);
+geben (5 - 5) oder (3 < 5);
+geben nicht (5 == 3);
+geben (10 > 5) und (3 < 2);
+
+# ============================================================
+# 18. TYPE CONVERSION TESTS
+# ============================================================
+GANZ intVal = 10;
+KOMM doubleVal = 3;
+geben intVal + doubleVal;
+geben doubleVal * 2;
+
+# ============================================================
+# TEST COMPLETE
+# ============================================================
+geben 999;

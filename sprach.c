@@ -12,7 +12,8 @@ typedef enum {
     TOK_WENN, TOK_SONST, TOK_FUR, TOK_WAEHREND, TOK_WAHL, TOK_FALL,
     TOK_GEBEN, TOK_LESEN,
     TOK_UND, TOK_ODER, TOK_NICHT,
-    TOK_PLUS, TOK_MINUS, TOK_MUL, TOK_DIV, TOK_MOD,
+    TOK_PLUS, TOK_MINUS, TOK_MUL, TOK_DIV, TOK_MOD, TOK_POW,
+    TOK_BITAND, TOK_BITOR, TOK_BITXOR, TOK_LSHIFT, TOK_RSHIFT,
     TOK_EQ, TOK_NE, TOK_LT, TOK_LE, TOK_GT, TOK_GE,
     TOK_ASSIGN, TOK_LPAREN, TOK_RPAREN, TOK_LBRACE, TOK_RBRACE,
     TOK_LBRACKET, TOK_RBRACKET, TOK_SEMICOLON, TOK_COMMA, TOK_COLON
@@ -62,6 +63,39 @@ void lexer_skip_comment(Lexer *lex) {
             lexer_advance(lex);
         }
     }
+}
+
+Token *lexer_read_string(Lexer *lex) {
+    Token *tok = malloc(sizeof(Token));
+    char str[256] = "";
+    lexer_advance(lex); // skip opening quote
+    
+    while (lex->current_char != '\0' && lex->current_char != '"') {
+        sprintf(str + strlen(str), "%c", lex->current_char);
+        lexer_advance(lex);
+    }
+    
+    if (lex->current_char == '"') {
+        lexer_advance(lex); // skip closing quote
+    }
+    
+    tok->type = TOK_STRING;
+    strcpy(tok->value.strval, str);
+    return tok;
+}
+
+Token *lexer_read_char(Lexer *lex) {
+    Token *tok = malloc(sizeof(Token));
+    lexer_advance(lex); // skip opening quote
+    char ch = lex->current_char;
+    lexer_advance(lex);
+    if (lex->current_char == '\'') {
+        lexer_advance(lex); // skip closing quote
+    }
+    
+    tok->type = TOK_STRING;
+    sprintf(tok->value.strval, "%c", ch);
+    return tok;
 }
 
 Token *lexer_read_number(Lexer *lex) {
@@ -133,6 +167,14 @@ Token *lexer_get_next_token(Lexer *lex) {
         return tok;
     }
     
+    if (lex->current_char == '"') {
+        return lexer_read_string(lex);
+    }
+    
+    if (lex->current_char == '\'') {
+        return lexer_read_char(lex);
+    }
+    
     if (isdigit(lex->current_char)) {
         return lexer_read_number(lex);
     }
@@ -148,6 +190,9 @@ Token *lexer_get_next_token(Lexer *lex) {
     if (lex->current_char == '*') { tok->type = TOK_MUL; lexer_advance(lex); return tok; }
     if (lex->current_char == '/') { tok->type = TOK_DIV; lexer_advance(lex); return tok; }
     if (lex->current_char == '%') { tok->type = TOK_MOD; lexer_advance(lex); return tok; }
+    if (lex->current_char == '^') { tok->type = TOK_POW; lexer_advance(lex); return tok; }
+    if (lex->current_char == '&') { tok->type = TOK_BITAND; lexer_advance(lex); return tok; }
+    if (lex->current_char == '|') { tok->type = TOK_BITOR; lexer_advance(lex); return tok; }
     if (lex->current_char == '(') { tok->type = TOK_LPAREN; lexer_advance(lex); return tok; }
     if (lex->current_char == ')') { tok->type = TOK_RPAREN; lexer_advance(lex); return tok; }
     if (lex->current_char == '{') { tok->type = TOK_LBRACE; lexer_advance(lex); return tok; }
@@ -182,7 +227,10 @@ Token *lexer_get_next_token(Lexer *lex) {
     
     if (lex->current_char == '<') {
         lexer_advance(lex);
-        if (lex->current_char == '=') {
+        if (lex->current_char == '<') {
+            tok->type = TOK_LSHIFT;
+            lexer_advance(lex);
+        } else if (lex->current_char == '=') {
             tok->type = TOK_LE;
             lexer_advance(lex);
         } else {
@@ -193,7 +241,10 @@ Token *lexer_get_next_token(Lexer *lex) {
     
     if (lex->current_char == '>') {
         lexer_advance(lex);
-        if (lex->current_char == '=') {
+        if (lex->current_char == '>') {
+            tok->type = TOK_RSHIFT;
+            lexer_advance(lex);
+        } else if (lex->current_char == '=') {
             tok->type = TOK_GE;
             lexer_advance(lex);
         } else {
@@ -213,7 +264,7 @@ typedef enum {
     NODE_PROGRAM, NODE_BLOCK,
     NODE_DECL, NODE_ASSIGN, NODE_OUTPUT, NODE_INPUT,
     NODE_WHILE, NODE_IF, NODE_FOR,
-    NODE_BINOP, NODE_UNOP, NODE_NUMBER, NODE_VAR, NODE_CALL,
+    NODE_BINOP, NODE_UNOP, NODE_NUMBER, NODE_STRING, NODE_VAR, NODE_CALL,
     NODE_ARRAY_ACCESS, NODE_ARRAY_INIT
 } NodeType;
 
@@ -264,6 +315,9 @@ typedef struct ASTNode {
             double value;
         } number;
         struct {
+            char value[256];
+        } string;
+        struct {
             char name[256];
         } var;
         struct {
@@ -281,6 +335,13 @@ ASTNode *ast_create_number(double value) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = NODE_NUMBER;
     node->data.number.value = value;
+    return node;
+}
+
+ASTNode *ast_create_string(const char *value) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = NODE_STRING;
+    strcpy(node->data.string.value, value);
     return node;
 }
 
@@ -337,6 +398,8 @@ void parser_advance(Parser *parser) {
 ASTNode *parser_parse_expression(Parser *parser);
 ASTNode *parser_parse_statement(Parser *parser);
 ASTNode *parser_parse_block(Parser *parser);
+ASTNode *parser_parse_power(Parser *parser);
+ASTNode *parser_parse_bitwise(Parser *parser);
 
 ASTNode *parser_parse_primary(Parser *parser) {
     Token *tok = parser->current_token;
@@ -348,6 +411,12 @@ ASTNode *parser_parse_primary(Parser *parser) {
     if (tok->type == TOK_DOUBLE) {
         parser_advance(parser);
         return ast_create_number(tok->value.doubleval);
+    }
+    if (tok->type == TOK_STRING) {
+        char str[256];
+        strcpy(str, tok->value.strval);
+        parser_advance(parser);
+        return ast_create_string(str);
     }
     if (tok->type == TOK_ID) {
         char name[256];
@@ -389,7 +458,7 @@ ASTNode *parser_parse_primary(Parser *parser) {
 }
 
 ASTNode *parser_parse_term(Parser *parser) {
-    ASTNode *left = parser_parse_primary(parser);
+    ASTNode *left = parser_parse_power(parser);
     
     while (parser->current_token->type == TOK_MUL ||
            parser->current_token->type == TOK_DIV ||
@@ -397,8 +466,20 @@ ASTNode *parser_parse_term(Parser *parser) {
         char op = parser->current_token->type == TOK_MUL ? '*' :
                  parser->current_token->type == TOK_DIV ? '/' : '%';
         parser_advance(parser);
-        ASTNode *right = parser_parse_primary(parser);
+        ASTNode *right = parser_parse_power(parser);
         left = ast_create_binop(op, left, right);
+    }
+    
+    return left;
+}
+
+ASTNode *parser_parse_power(Parser *parser) {
+    ASTNode *left = parser_parse_primary(parser);
+    
+    if (parser->current_token->type == TOK_POW) {
+        parser_advance(parser);
+        ASTNode *right = parser_parse_power(parser); // right associative
+        left = ast_create_binop('^', left, right);
     }
     
     return left;
@@ -419,7 +500,7 @@ ASTNode *parser_parse_arithmetic(Parser *parser) {
 }
 
 ASTNode *parser_parse_comparison(Parser *parser) {
-    ASTNode *left = parser_parse_arithmetic(parser);
+    ASTNode *left = parser_parse_bitwise(parser);
     
     while (parser->current_token->type == TOK_LT ||
            parser->current_token->type == TOK_LE ||
@@ -434,6 +515,27 @@ ASTNode *parser_parse_comparison(Parser *parser) {
         else if (parser->current_token->type == TOK_GE) op = 'G';
         else if (parser->current_token->type == TOK_EQ) op = '=';
         else op = '!';
+        
+        parser_advance(parser);
+        ASTNode *right = parser_parse_bitwise(parser);
+        left = ast_create_binop(op, left, right);
+    }
+    
+    return left;
+}
+
+ASTNode *parser_parse_bitwise(Parser *parser) {
+    ASTNode *left = parser_parse_arithmetic(parser);
+    
+    while (parser->current_token->type == TOK_BITAND ||
+           parser->current_token->type == TOK_BITOR ||
+           parser->current_token->type == TOK_LSHIFT ||
+           parser->current_token->type == TOK_RSHIFT) {
+        char op;
+        if (parser->current_token->type == TOK_BITAND) op = '&';
+        else if (parser->current_token->type == TOK_BITOR) op = '|';
+        else if (parser->current_token->type == TOK_LSHIFT) op = 'l';
+        else op = 'r';
         
         parser_advance(parser);
         ASTNode *right = parser_parse_arithmetic(parser);
@@ -606,6 +708,8 @@ ASTNode *parser_parse_statement(Parser *parser) {
 typedef struct {
     char name[256];
     double value;
+    char string_value[256];
+    int is_string;
     double *array;
     int array_size;
     int is_array;
@@ -635,12 +739,36 @@ void env_set(Environment *env, const char *name, double value) {
     for (int i = 0; i < env->var_count; i++) {
         if (strcmp(env->vars[i].name, name) == 0) {
             env->vars[i].value = value;
+            env->vars[i].is_string = 0;
+            env->vars[i].is_array = 0;
+            env->vars[i].array = NULL;
             return;
         }
     }
     if (env->var_count < MAX_VARS) {
         strcpy(env->vars[env->var_count].name, name);
         env->vars[env->var_count].value = value;
+        env->vars[env->var_count].is_string = 0;
+        env->vars[env->var_count].is_array = 0;
+        env->vars[env->var_count].array = NULL;
+        env->var_count++;
+    }
+}
+
+void env_set_string(Environment *env, const char *name, const char *value) {
+    for (int i = 0; i < env->var_count; i++) {
+        if (strcmp(env->vars[i].name, name) == 0) {
+            strcpy(env->vars[i].string_value, value);
+            env->vars[i].is_string = 1;
+            env->vars[i].is_array = 0;
+            env->vars[i].array = NULL;
+            return;
+        }
+    }
+    if (env->var_count < MAX_VARS) {
+        strcpy(env->vars[env->var_count].name, name);
+        strcpy(env->vars[env->var_count].string_value, value);
+        env->vars[env->var_count].is_string = 1;
         env->vars[env->var_count].is_array = 0;
         env->vars[env->var_count].array = NULL;
         env->var_count++;
@@ -653,6 +781,7 @@ void env_set_array(Environment *env, const char *name, double *array, int size) 
             env->vars[i].array = array;
             env->vars[i].array_size = size;
             env->vars[i].is_array = 1;
+            env->vars[i].is_string = 0;
             return;
         }
     }
@@ -661,6 +790,7 @@ void env_set_array(Environment *env, const char *name, double *array, int size) 
         env->vars[env->var_count].array = array;
         env->vars[env->var_count].array_size = size;
         env->vars[env->var_count].is_array = 1;
+        env->vars[env->var_count].is_string = 0;
         env->var_count++;
     }
 }
@@ -685,6 +815,9 @@ double eval(ASTNode *node, Environment *env) {
         case NODE_NUMBER:
             return node->data.number.value;
         
+        case NODE_STRING:
+            return 0;  // Strings don't have numeric value
+        
         case NODE_VAR:
             return env_get(env, node->data.var.name);
         
@@ -697,7 +830,12 @@ double eval(ASTNode *node, Environment *env) {
                 case '*': return left * right;
                 case '/': return (right != 0) ? left / right : 0;
                 case '%': return (int)left % (int)right;
+                case '^': return pow(left, right);
+                case '&': return (int)left & (int)right;
+                case '|': return (int)left | (int)right;
                 case '<': return (left < right) ? 1 : 0;
+                case 'l': return (int)left << (int)right;
+                case 'r': return (int)left >> (int)right;
                 case 'L': return (left <= right) ? 1 : 0;
                 case '>': return (left > right) ? 1 : 0;
                 case 'G': return (left >= right) ? 1 : 0;
@@ -722,7 +860,11 @@ double eval(ASTNode *node, Environment *env) {
                     array[i] = eval(arr_init->data.array_init.elements[i], env);
                 }
                 env_set_array(env, node->data.decl.varname, array, arr_init->data.array_init.count);
+            } else if (node->data.decl.value->type == NODE_STRING) {
+                // Handle string initialization
+                env_set_string(env, node->data.decl.varname, node->data.decl.value->data.string.value);
             } else {
+                // Handle numeric initialization
                 double val = eval(node->data.decl.value, env);
                 env_set(env, node->data.decl.varname, val);
             }
@@ -741,8 +883,26 @@ double eval(ASTNode *node, Environment *env) {
         }
         
         case NODE_OUTPUT: {
-            double val = eval(node->data.output.expr, env);
-            printf("%.0f\n", val);
+            ASTNode *expr = node->data.output.expr;
+            if (expr->type == NODE_STRING) {
+                printf("%s\n", expr->data.string.value);
+            } else if (expr->type == NODE_VAR) {
+                // Check if it's a string variable
+                for (int i = 0; i < env->var_count; i++) {
+                    if (strcmp(env->vars[i].name, expr->data.var.name) == 0) {
+                        if (env->vars[i].is_string) {
+                            printf("%s\n", env->vars[i].string_value);
+                        } else {
+                            printf("%.0f\n", env->vars[i].value);
+                        }
+                        return 0;
+                    }
+                }
+                printf("%.0f\n", env_get(env, expr->data.var.name));
+            } else {
+                double val = eval(expr, env);
+                printf("%.0f\n", val);
+            }
             return 0;
         }
         

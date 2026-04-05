@@ -1,4 +1,281 @@
-GANZ arr[] = {1, 2, 3, 4, 5};
-geben arr[0];
-geben arr[2];
-geben arr[4];
+
+# ============================================================
+# 4. LOGICAL OPERATORS
+# ============================================================
+geben 1 und 1;          # 1 (true)
+geben 1 und 0;          # 0 (false)
+geben 0 oder 1;         # 1 (true)
+geben 0 oder 0;         # 0 (false)
+geben nicht 1;          # 0 (false)
+geben nicht 0;          # 1 (true)
+geben (1 und 1) oder 0; # 1 (true)
+
+# ============================================================
+# 5. BITWISE OPERATORS
+# ============================================================
+geben 5 & 3;            # 1 (binary: 101 & 011 = 001)
+geben 5 | 3;            # 7 (binary: 101 | 011 = 111)
+geben 5 ^ 3;            # 6 (binary: 101 ^ 011 = 110)
+geben 5 << 1;           # 10 (binary: 101 << 1 = 1010)
+geben 8 >> 1;           # 4 (binary: 1000 >> 1 = 100)
+
+# ============================================================
+# 6. VARIABLE ASSIGNMENT
+# ============================================================
+GANZ x = 5;
+x = 10;
+geben x;                # 10
+
+GANZ y = 20;
+y = y + 5;
+geben y;                # 25
+
+# Case Sensitivity
+GANZ Name = 100;
+GANZ name = 200;
+geben Name;             # 100
+geben name;             # 200
+
+# ============================================================
+# 7. IF-ELSE STATEMENTS
+# ============================================================
+GANZ testNum = 15;
+
+wenn (testNum > 10) {
+    geben 1;            # Should print 1
+} sonst {
+    geben 0;
+}
+
+wenn (testNum < 10) {
+    geben 0;
+} sonst {
+    geben 2;            # Should print 2
+}
+
+# If-Else If-Else
+GANZ score = 75;
+wenn (score >= 90) {
+    geben 1;
+} sonst wenn (score >= 80) {
+    geben 2;
+} sonst wenn (score >= 70) {
+    geben 3;            # Should print 3
+} sonst {
+    geben 4;
+}
+
+# Nested If
+GANZ a = 5;
+GANZ b = 10;
+wenn (a < b) {
+    wenn (a > 0) {
+        geben 1;        # Should print 1
+    }
+}
+
+# ============================================================
+# 8. WHILE LOOPS
+# ============================================================
+GANZ counter = 0;
+waehrend (counter < 5) {
+    geben counter;      # Should print: 0 1 2 3 4
+    counter = counter + 1;
+}
+
+# While with accumulation
+GANZ sum = 0;
+GANZ i = 1;
+waehrend (i <= 5) {
+    sum = sum + i;      # 1+2+3+4+5 = 15
+    i = i + 1;
+}
+geben sum;              # 15
+
+# ============================================================
+# 9. FOR LOOPS
+# ============================================================
+fuer (j = 0; j < 5; j = j + 1) {
+    geben j;            # Should print: 0 1 2 3 4
+}
+
+# For with step
+fuer (k = 0; k < 10; k = k + 2) {
+    geben k;            # Should print: 0 2 4 6 8
+}
+
+# Nested For Loops (3x3 table)
+fuer (row = 1; row <= 3; row = row + 1) {
+    fuer (col = 1; col <= 3; col = col + 1) {
+        geben row * col;  # Multiplication table
+    }
+}
+
+# ============================================================
+# 10. SWITCH STATEMENTS
+# ============================================================
+GANZ choice = 2;
+wahl (choice) {
+    fall 1: geben 100;
+    fall 2: geben 200;  # Should print 200
+    fall 3: geben 300;
+    standard: geben 999;
+}
+
+# Switch with default
+GANZ day = 5;
+wahl (day) {
+    fall 1: geben 1;
+    fall 2: geben 2;
+    fall 3: geben 3;
+    standard: geben 0;  # Should print 0
+}
+
+# ============================================================
+# 11. ARRAYS
+# ============================================================
+# Array Declaration and Access
+GANZ numbers[] = {10, 20, 30, 40, 50};
+geben numbers[0];       # 10
+geben numbers[2];       # 30
+geben numbers[4];       # 50
+
+# Array Iteration
+fuer (idx = 0; idx < 5; idx = idx + 1) {
+    geben numbers[idx];  # Should print: 10 20 30 40 50
+}
+
+# Array with Doubles
+KOMM decimals[] = {1.5, 2.7, 3.2, 4.9};
+geben decimals[0];      # 1.5
+geben decimals[2];      # 3.2
+
+# String Array
+TEXT words[] = {"Hallo", "Welt", "Sprach"};
+geben words[0];         # Hallo
+geben words[2];         # Sprach
+
+# ============================================================
+# 12. ARRAY OPERATIONS
+# ============================================================
+# Note: These may require additional implementation
+# Uncomment if supported:
+# GANZ myArray[] = {1, 2, 3};
+# myArray hinzufuegen 4;      # Append
+# myArray entfernen;          # Pop
+# myArray sortieren;          # Sort
+
+# ============================================================
+# 13. MATHEMATICAL FUNCTIONS
+# ============================================================
+geben quadrat_wurzel(16);      # sqrt(16) = 4
+geben quadrat_wurzel(25);      # sqrt(25) = 5
+geben mathe_sin(0);            # sin(0) ≈ 0
+geben mathe_cos(0);            # cos(0) = 1
+geben mathe_log(1);            # log(1) = 0
+
+# ============================================================
+# 14. COMMENTS
+# ============================================================
+# This is a single-line comment - should be ignored
+geben 888;
+
+## This is a
+multi-line comment
+it should be ignored ##
+
+geben 777;
+
+# ============================================================
+# 15. COMPLEX EXPRESSIONS
+# ============================================================
+geben (5 + 3) * 2 - 1;         # (8) * 2 - 1 = 15
+geben 10 / 2 + 3 * 4;          # 5 + 12 = 17
+geben (10 + 5) * (3 - 1);      # 15 * 2 = 30
+
+# ============================================================
+# 16. FIBONACCI SEQUENCE (10 numbers)
+# ============================================================
+GANZ fib_a = 0;
+GANZ fib_b = 1;
+GANZ fib_count = 0;
+
+waehrend (fib_count < 10) {
+    geben fib_a;                # Should print: 0 1 1 2 3 5 8 13 21 34
+    GANZ fib_temp = fib_a + fib_b;
+    fib_a = fib_b;
+    fib_b = fib_temp;
+    fib_count = fib_count + 1;
+}
+
+# ============================================================
+# 17. FACTORIAL CALCULATION (5!)
+# ============================================================
+GANZ factorial = 1;
+GANZ fact_n = 5;
+fuer (fact_i = 1; fact_i <= fact_n; fact_i = fact_i + 1) {
+    factorial = factorial * fact_i;
+}
+geben factorial;                # 120
+
+# ============================================================
+# 18. SUM OF ARRAY
+# ============================================================
+GANZ array[] = {5, 10, 15, 20, 25};
+GANZ array_sum = 0;
+GANZ array_idx = 0;
+
+waehrend (array_idx < 5) {
+    array_sum = array_sum + array[array_idx];
+    array_idx = array_idx + 1;
+}
+geben array_sum;                # 75
+
+# ============================================================
+# 19. FIND MAXIMUM IN ARRAY
+# ============================================================
+GANZ values[] = {3, 7, 2, 9, 1, 5};
+GANZ max_val = values[0];
+GANZ max_idx = 1;
+
+waehrend (max_idx < 6) {
+    wenn (values[max_idx] > max_val) {
+        max_val = values[max_idx];
+    }
+    max_idx = max_idx + 1;
+}
+geben max_val;                  # 9
+
+# ============================================================
+# 20. NESTED LOOPS WITH CONDITIONS
+# ============================================================
+fuer (outer = 1; outer <= 3; outer = outer + 1) {
+    fuer (inner = 1; inner <= 3; inner = inner + 1) {
+        wenn (outer == inner) {
+            geben 1;            # Print 1 on diagonal
+        } sonst {
+            geben 0;            # Print 0 elsewhere
+        }
+    }
+}
+
+# ============================================================
+# 21. COMBINED OPERATORS
+# ============================================================
+geben (5 + 3) und (2 > 1);     # 1 (true)
+geben (5 - 5) oder (3 < 5);    # 1 (true)
+geben nicht (5 == 3);          # 1 (true)
+geben (10 > 5) und (3 < 2);    # 0 (false)
+
+# ============================================================
+# 22. TYPE CONVERSION TESTS
+# ============================================================
+GANZ intVal = 10;
+KOMM doubleVal = 3.5;
+geben intVal + doubleVal;       # 13.5 (int + double)
+geben doubleVal * 2;           # 7.0
+
+# ============================================================
+# TEST COMPLETE
+# ============================================================
+geben 999;                      # Marker: End of test
