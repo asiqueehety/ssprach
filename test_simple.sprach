@@ -1,6 +1,0 @@
-GANZ nums[] = {1, 2, 3};
-geben nums[0];
-geben nums[1];
-geben nums[2];
-nums hinzufuegen 4;
-geben nums[3];
