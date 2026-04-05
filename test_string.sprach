@@ -1,2 +1,0 @@
-TEXT stringVar = "Hello SPRACH";
-geben stringVar;

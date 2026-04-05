@@ -59,8 +59,25 @@ void lexer_skip_whitespace(Lexer *lex) {
 
 void lexer_skip_comment(Lexer *lex) {
     if (lex->current_char == '#') {
-        while (lex->current_char != '\0' && lex->current_char != '\n') {
-            lexer_advance(lex);
+        // Check for multi-line comment ##
+        if (lex->input[lex->pos + 1] == '#') {
+            lexer_advance(lex); // skip first #
+            lexer_advance(lex); // skip second #
+            
+            // Skip until we find ## again
+            while (lex->current_char != '\0') {
+                if (lex->current_char == '#' && lex->input[lex->pos + 1] == '#') {
+                    lexer_advance(lex); // skip first #
+                    lexer_advance(lex); // skip second #
+                    break;
+                }
+                lexer_advance(lex);
+            }
+        } else {
+            // Single-line comment
+            while (lex->current_char != '\0' && lex->current_char != '\n') {
+                lexer_advance(lex);
+            }
         }
     }
 }
@@ -132,7 +149,7 @@ Token *lexer_read_id(Lexer *lex) {
     else if (strcmp(id_str, "ZEICHEN") == 0) tok->type = TOK_ZEICHEN;
     else if (strcmp(id_str, "wenn") == 0) tok->type = TOK_WENN;
     else if (strcmp(id_str, "sonst") == 0) tok->type = TOK_SONST;
-    else if (strcmp(id_str, "fur") == 0) tok->type = TOK_FUR;
+    else if (strcmp(id_str, "fur") == 0 || strcmp(id_str, "fuer") == 0) tok->type = TOK_FUR;
     else if (strcmp(id_str, "waehrend") == 0) tok->type = TOK_WAEHREND;
     else if (strcmp(id_str, "wahl") == 0) tok->type = TOK_WAHL;
     else if (strcmp(id_str, "fall") == 0) tok->type = TOK_FALL;
@@ -263,7 +280,7 @@ Token *lexer_get_next_token(Lexer *lex) {
 typedef enum {
     NODE_PROGRAM, NODE_BLOCK,
     NODE_DECL, NODE_ASSIGN, NODE_OUTPUT, NODE_INPUT,
-    NODE_WHILE, NODE_IF, NODE_FOR,
+    NODE_WHILE, NODE_IF, NODE_FOR, NODE_WAHL,
     NODE_BINOP, NODE_UNOP, NODE_NUMBER, NODE_STRING, NODE_VAR, NODE_CALL,
     NODE_ARRAY_ACCESS, NODE_ARRAY_INIT
 } NodeType;
@@ -303,6 +320,15 @@ typedef struct ASTNode {
             struct ASTNode *body;
         } for_node;
         struct {
+            struct ASTNode *expr;
+            struct {
+                double value;
+                struct ASTNode *body;
+            } cases[100];
+            int case_count;
+            struct ASTNode *default_body;
+        } wahl_node;
+        struct {
             char op;
             struct ASTNode *left;
             struct ASTNode *right;
@@ -328,6 +354,11 @@ typedef struct ASTNode {
             struct ASTNode **elements;
             int count;
         } array_init;
+        struct {
+            char name[256];
+            struct ASTNode **args;
+            int arg_count;
+        } call;
     } data;
 } ASTNode;
 
@@ -396,6 +427,9 @@ void parser_advance(Parser *parser) {
 }
 
 ASTNode *parser_parse_expression(Parser *parser);
+ASTNode *parser_parse_logical_or(Parser *parser);
+ASTNode *parser_parse_logical_and(Parser *parser);
+ASTNode *parser_parse_logical_not(Parser *parser);
 ASTNode *parser_parse_statement(Parser *parser);
 ASTNode *parser_parse_block(Parser *parser);
 ASTNode *parser_parse_power(Parser *parser);
@@ -422,6 +456,30 @@ ASTNode *parser_parse_primary(Parser *parser) {
         char name[256];
         strcpy(name, tok->value.strval);
         parser_advance(parser);
+        
+        // Check for function call
+        if (parser->current_token->type == TOK_LPAREN) {
+            parser_advance(parser); // skip (
+            
+            ASTNode *call_node = malloc(sizeof(ASTNode));
+            call_node->type = NODE_CALL;
+            strcpy(call_node->data.call.name, name);
+            call_node->data.call.args = malloc(sizeof(ASTNode*) * 10);
+            call_node->data.call.arg_count = 0;
+            
+            while (parser->current_token->type != TOK_RPAREN && 
+                   parser->current_token->type != TOK_EOF) {
+                call_node->data.call.args[call_node->data.call.arg_count++] = 
+                    parser_parse_expression(parser);
+                
+                if (parser->current_token->type == TOK_COMMA) {
+                    parser_advance(parser);
+                }
+            }
+            
+            parser_advance(parser); // skip )
+            return call_node;
+        }
         
         // Check for array indexing
         if (parser->current_token->type == TOK_LBRACKET) {
@@ -546,6 +604,44 @@ ASTNode *parser_parse_bitwise(Parser *parser) {
 }
 
 ASTNode *parser_parse_expression(Parser *parser) {
+    return parser_parse_logical_or(parser);
+}
+
+ASTNode *parser_parse_logical_or(Parser *parser) {
+    ASTNode *left = parser_parse_logical_and(parser);
+    
+    while (parser->current_token->type == TOK_ODER) {
+        parser_advance(parser);
+        ASTNode *right = parser_parse_logical_and(parser);
+        left = ast_create_binop('O', left, right);
+    }
+    
+    return left;
+}
+
+ASTNode *parser_parse_logical_and(Parser *parser) {
+    ASTNode *left = parser_parse_logical_not(parser);
+    
+    while (parser->current_token->type == TOK_UND) {
+        parser_advance(parser);
+        ASTNode *right = parser_parse_logical_not(parser);
+        left = ast_create_binop('A', left, right);
+    }
+    
+    return left;
+}
+
+ASTNode *parser_parse_logical_not(Parser *parser) {
+    if (parser->current_token->type == TOK_NICHT) {
+        parser_advance(parser);
+        ASTNode *expr = parser_parse_logical_not(parser);
+        ASTNode *node = malloc(sizeof(ASTNode));
+        node->type = NODE_UNOP;
+        node->data.unop.op = 'N';
+        node->data.unop.operand = expr;
+        return node;
+    }
+    
     return parser_parse_comparison(parser);
 }
 
@@ -676,6 +772,66 @@ ASTNode *parser_parse_statement(Parser *parser) {
         return ast_create_while(condition, body);
     }
     
+    if (parser->current_token->type == TOK_FUR) {
+        parser_advance(parser);
+        parser_advance(parser); // skip (
+        
+        // Parse init (just expression, not full statement)
+        ASTNode *init = NULL;
+        if (parser->current_token->type == TOK_ID) {
+            char varname[256];
+            strcpy(varname, parser->current_token->value.strval);
+            parser_advance(parser);
+            
+            if (parser->current_token->type == TOK_ASSIGN) {
+                parser_advance(parser);
+                ASTNode *assign = malloc(sizeof(ASTNode));
+                assign->type = NODE_ASSIGN;
+                strcpy(assign->data.assign.varname, varname);
+                assign->data.assign.value = parser_parse_expression(parser);
+                init = assign;
+            }
+        }
+        
+        parser_advance(parser); // skip ;
+        
+        // Parse condition
+        ASTNode *condition = parser_parse_expression(parser);
+        parser_advance(parser); // skip ;
+        
+        // Parse increment (just expression)
+        ASTNode *increment = NULL;
+        if (parser->current_token->type == TOK_ID) {
+            char varname[256];
+            strcpy(varname, parser->current_token->value.strval);
+            parser_advance(parser);
+            
+            if (parser->current_token->type == TOK_ASSIGN) {
+                parser_advance(parser);
+                ASTNode *assign = malloc(sizeof(ASTNode));
+                assign->type = NODE_ASSIGN;
+                strcpy(assign->data.assign.varname, varname);
+                assign->data.assign.value = parser_parse_expression(parser);
+                increment = assign;
+            }
+        }
+        
+        parser_advance(parser); // skip )
+        
+        // Parse body
+        ASTNode *body = parser_parse_block(parser);
+        
+        // Create FOR node
+        ASTNode *for_node = malloc(sizeof(ASTNode));
+        for_node->type = NODE_FOR;
+        for_node->data.for_node.init = init;
+        for_node->data.for_node.condition = condition;
+        for_node->data.for_node.increment = increment;
+        for_node->data.for_node.body = body;
+        
+        return for_node;
+    }
+    
     if (parser->current_token->type == TOK_WENN) {
         parser_advance(parser);
         parser_advance(parser); // skip (
@@ -694,6 +850,52 @@ ASTNode *parser_parse_statement(Parser *parser) {
         }
         
         return if_node;
+    }
+    
+    if (parser->current_token->type == TOK_WAHL) {
+        parser_advance(parser);
+        parser_advance(parser); // skip (
+        ASTNode *expr = parser_parse_expression(parser);
+        parser_advance(parser); // skip )
+        
+        parser_advance(parser); // skip {
+        
+        ASTNode *wahl_node = malloc(sizeof(ASTNode));
+        wahl_node->type = NODE_WAHL;
+        wahl_node->data.wahl_node.expr = expr;
+        wahl_node->data.wahl_node.case_count = 0;
+        wahl_node->data.wahl_node.default_body = NULL;
+        
+        while (parser->current_token->type != TOK_RBRACE && 
+               parser->current_token->type != TOK_EOF) {
+            
+            if (parser->current_token->type == TOK_FALL) {
+                parser_advance(parser); // skip 'fall'
+                
+                // Parse case value
+                double case_val = parser->current_token->value.intval;
+                parser_advance(parser); // skip number
+                parser_advance(parser); // skip :
+                
+                // Parse case body (single statement)
+                ASTNode *case_body = parser_parse_statement(parser);
+                
+                wahl_node->data.wahl_node.cases[wahl_node->data.wahl_node.case_count].value = case_val;
+                wahl_node->data.wahl_node.cases[wahl_node->data.wahl_node.case_count].body = case_body;
+                wahl_node->data.wahl_node.case_count++;
+            } else if (parser->current_token->type == TOK_ID &&
+                       strcmp(parser->current_token->value.strval, "standard") == 0) {
+                parser_advance(parser); // skip 'standard'
+                parser_advance(parser); // skip :
+                wahl_node->data.wahl_node.default_body = parser_parse_statement(parser);
+            } else {
+                parser_advance(parser);
+            }
+        }
+        
+        parser_advance(parser); // skip }
+        
+        return wahl_node;
     }
     
     parser_advance(parser);
@@ -841,6 +1043,8 @@ double eval(ASTNode *node, Environment *env) {
                 case 'G': return (left >= right) ? 1 : 0;
                 case '=': return (left == right) ? 1 : 0;
                 case '!': return (left != right) ? 1 : 0;
+                case 'A': return (left != 0 && right != 0) ? 1 : 0;  // AND
+                case 'O': return (left != 0 || right != 0) ? 1 : 0;  // OR
             }
             return 0;
         }
@@ -848,6 +1052,7 @@ double eval(ASTNode *node, Environment *env) {
         case NODE_UNOP: {
             double val = eval(node->data.unop.operand, env);
             if (node->data.unop.op == '-') return -val;
+            if (node->data.unop.op == 'N') return (val == 0) ? 1 : 0;  // NOT
             return 0;
         }
         
@@ -914,11 +1119,74 @@ double eval(ASTNode *node, Environment *env) {
             return 0;
         }
         
+        case NODE_FOR: {
+            int count = 0;
+            if (node->data.for_node.init) {
+                eval(node->data.for_node.init, env);
+            }
+            while (eval(node->data.for_node.condition, env) && count++ < 100000) {
+                eval(node->data.for_node.body, env);
+                if (node->data.for_node.increment) {
+                    eval(node->data.for_node.increment, env);
+                }
+            }
+            return 0;
+        }
+        
         case NODE_IF: {
             if (eval(node->data.if_node.condition, env)) {
                 eval(node->data.if_node.body, env);
             } else if (node->data.if_node.else_body) {
                 eval(node->data.if_node.else_body, env);
+            }
+            return 0;
+        }
+        
+        case NODE_WAHL: {
+            double expr_val = eval(node->data.wahl_node.expr, env);
+            int matched = 0;
+            
+            for (int i = 0; i < node->data.wahl_node.case_count; i++) {
+                if (expr_val == node->data.wahl_node.cases[i].value) {
+                    eval(node->data.wahl_node.cases[i].body, env);
+                    matched = 1;
+                    break;  // Exit after first match (no fall-through)
+                }
+            }
+            
+            if (!matched && node->data.wahl_node.default_body) {
+                eval(node->data.wahl_node.default_body, env);
+            }
+            
+            return 0;
+        }
+        
+        case NODE_CALL: {
+            if (strcmp(node->data.call.name, "quadrat_wurzel") == 0) {
+                if (node->data.call.arg_count > 0) {
+                    double arg = eval(node->data.call.args[0], env);
+                    return sqrt(arg);
+                }
+            } else if (strcmp(node->data.call.name, "mathe_sin") == 0) {
+                if (node->data.call.arg_count > 0) {
+                    double arg = eval(node->data.call.args[0], env);
+                    return sin(arg * 3.14159265359 / 180.0);  // Convert degrees to radians
+                }
+            } else if (strcmp(node->data.call.name, "mathe_cos") == 0) {
+                if (node->data.call.arg_count > 0) {
+                    double arg = eval(node->data.call.args[0], env);
+                    return cos(arg * 3.14159265359 / 180.0);  // Convert degrees to radians
+                }
+            } else if (strcmp(node->data.call.name, "mathe_tan") == 0) {
+                if (node->data.call.arg_count > 0) {
+                    double arg = eval(node->data.call.args[0], env);
+                    return tan(arg * 3.14159265359 / 180.0);  // Convert degrees to radians
+                }
+            } else if (strcmp(node->data.call.name, "mathe_log") == 0) {
+                if (node->data.call.arg_count > 0) {
+                    double arg = eval(node->data.call.args[0], env);
+                    return log(arg);
+                }
             }
             return 0;
         }
