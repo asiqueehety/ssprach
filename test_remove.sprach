@@ -1,0 +1,7 @@
+GANZ nums[] = {10, 20, 30};
+geben nums[0];
+geben nums[1];
+geben nums[2];
+nums entfernen;
+geben nums[0];
+geben nums[1];

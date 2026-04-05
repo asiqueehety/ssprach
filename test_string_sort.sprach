@@ -1,0 +1,8 @@
+TEXT words[] = {"Zebra", "Apfel", "Banane"};
+geben words[0];
+geben words[1];
+geben words[2];
+words sortieren;
+geben words[0];
+geben words[1];
+geben words[2];

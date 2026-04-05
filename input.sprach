@@ -1,18 +1,53 @@
-
-
-# String Array
-TEXT words[] = {"Hallo", "Welt", "Sprach"};
-geben words[0];         # Hallo
-geben words[2];         # Sprach
-
 # ============================================================
 # 12. ARRAY OPERATIONS
 # ============================================================
-# Note: These may require additional implementation
-# Uncomment if supported:
-# GANZ myArray[] = {1, 2, 3};
-# myArray hinzufuegen 4;      # Append
-# myArray entfernen;          # Pop
-# myArray sortieren;          # Sort
 
+GANZ myArray[] = {1, 2, 3};
 
+# Display initial array
+geben 100;  # Marker: Initial array
+geben myArray[0];
+geben myArray[1];
+geben myArray[2];
+
+# Append operation
+myArray hinzufuegen 4;
+geben 200;  # Marker: After hinzufuegen 4
+geben myArray[0];
+geben myArray[1];
+geben myArray[2];
+geben myArray[3];
+
+# Append another element
+myArray hinzufuegen 5;
+geben 300;  # Marker: After hinzufuegen 5
+geben myArray[0];
+geben myArray[1];
+geben myArray[2];
+geben myArray[3];
+geben myArray[4];
+
+# Remove operation
+myArray entfernen;
+geben 400;  # Marker: After entfernen
+geben myArray[0];
+geben myArray[1];
+geben myArray[2];
+geben myArray[3];
+
+# Sort operation
+GANZ unsorted[] = {5, 2, 8, 1, 9};
+geben 500;  # Marker: Unsorted array
+geben unsorted[0];
+geben unsorted[1];
+geben unsorted[2];
+geben unsorted[3];
+geben unsorted[4];
+
+unsorted sortieren;
+geben 600;  # Marker: After sortieren
+geben unsorted[0];
+geben unsorted[1];
+geben unsorted[2];
+geben unsorted[3];
+geben unsorted[4];

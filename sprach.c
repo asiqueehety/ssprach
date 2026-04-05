@@ -12,6 +12,7 @@ typedef enum {
     TOK_WENN, TOK_SONST, TOK_FUR, TOK_WAEHREND, TOK_WAHL, TOK_FALL,
     TOK_GEBEN, TOK_LESEN,
     TOK_UND, TOK_ODER, TOK_NICHT,
+    TOK_HINZUFUEGEN, TOK_ENTFERNEN, TOK_SORTIEREN,
     TOK_PLUS, TOK_MINUS, TOK_MUL, TOK_DIV, TOK_MOD, TOK_POW,
     TOK_BITAND, TOK_BITOR, TOK_BITXOR, TOK_LSHIFT, TOK_RSHIFT,
     TOK_EQ, TOK_NE, TOK_LT, TOK_LE, TOK_GT, TOK_GE,
@@ -158,6 +159,9 @@ Token *lexer_read_id(Lexer *lex) {
     else if (strcmp(id_str, "und") == 0) tok->type = TOK_UND;
     else if (strcmp(id_str, "oder") == 0) tok->type = TOK_ODER;
     else if (strcmp(id_str, "nicht") == 0) tok->type = TOK_NICHT;
+    else if (strcmp(id_str, "hinzufuegen") == 0) tok->type = TOK_HINZUFUEGEN;
+    else if (strcmp(id_str, "entfernen") == 0) tok->type = TOK_ENTFERNEN;
+    else if (strcmp(id_str, "sortieren") == 0) tok->type = TOK_SORTIEREN;
     else {
         tok->type = TOK_ID;
         strcpy(tok->value.strval, id_str);
@@ -282,7 +286,7 @@ typedef enum {
     NODE_DECL, NODE_ASSIGN, NODE_OUTPUT, NODE_INPUT,
     NODE_WHILE, NODE_IF, NODE_FOR, NODE_WAHL,
     NODE_BINOP, NODE_UNOP, NODE_NUMBER, NODE_STRING, NODE_VAR, NODE_CALL,
-    NODE_ARRAY_ACCESS, NODE_ARRAY_INIT
+    NODE_ARRAY_ACCESS, NODE_ARRAY_INIT, NODE_ARRAY_METHOD
 } NodeType;
 
 typedef struct ASTNode {
@@ -359,6 +363,11 @@ typedef struct ASTNode {
             struct ASTNode **args;
             int arg_count;
         } call;
+        struct {
+            char array_name[256];
+            int method;  // 0=hinzufuegen, 1=entfernen, 2=sortieren
+            struct ASTNode *arg;  // For hinzufuegen, the value to add
+        } array_method;
     } data;
 } ASTNode;
 
@@ -736,6 +745,36 @@ ASTNode *parser_parse_statement(Parser *parser) {
         char varname[256];
         strcpy(varname, parser->current_token->value.strval);
         parser_advance(parser);
+        
+        // Check for array method calls
+        if (parser->current_token->type == TOK_HINZUFUEGEN ||
+            parser->current_token->type == TOK_ENTFERNEN ||
+            parser->current_token->type == TOK_SORTIEREN) {
+            
+            int method;
+            if (parser->current_token->type == TOK_HINZUFUEGEN) method = 0;
+            else if (parser->current_token->type == TOK_ENTFERNEN) method = 1;
+            else method = 2;
+            
+            parser_advance(parser);
+            
+            ASTNode *arr_method = malloc(sizeof(ASTNode));
+            arr_method->type = NODE_ARRAY_METHOD;
+            strcpy(arr_method->data.array_method.array_name, varname);
+            arr_method->data.array_method.method = method;
+            arr_method->data.array_method.arg = NULL;
+            
+            // For hinzufuegen, parse the argument
+            if (method == 0) {
+                arr_method->data.array_method.arg = parser_parse_expression(parser);
+            }
+            
+            if (parser->current_token->type == TOK_SEMICOLON) {
+                parser_advance(parser);
+            }
+            
+            return arr_method;
+        }
         
         if (parser->current_token->type == TOK_ASSIGN) {
             parser_advance(parser);
@@ -1274,6 +1313,74 @@ double eval(ASTNode *node, Environment *env) {
             for (int i = 0; i < node->data.block.count; i++) {
                 eval(node->data.block.statements[i], env);
             }
+            return 0;
+        }
+        
+        case NODE_ARRAY_METHOD: {
+            char *array_name = node->data.array_method.array_name;
+            int method = node->data.array_method.method;
+            
+            // Find the array in environment
+            for (int i = 0; i < env->var_count; i++) {
+                if (strcmp(env->vars[i].name, array_name) == 0) {
+                    if (method == 0) {  // hinzufuegen - append
+                        double value = eval(node->data.array_method.arg, env);
+                        int new_size = env->vars[i].array_size + 1;
+                        
+                        if (env->vars[i].is_string_array) {
+                            // For string arrays, this shouldn't happen typically
+                        } else {
+                            // Resize numeric array
+                            double *new_array = malloc(sizeof(double) * new_size);
+                            for (int j = 0; j < env->vars[i].array_size; j++) {
+                                new_array[j] = env->vars[i].array[j];
+                            }
+                            new_array[env->vars[i].array_size] = value;
+                            
+                            if (env->vars[i].array) free(env->vars[i].array);
+                            env->vars[i].array = new_array;
+                            env->vars[i].array_size = new_size;
+                        }
+                    } else if (method == 1) {  // entfernen - remove last
+                        if (env->vars[i].array_size > 0) {
+                            if (env->vars[i].is_string_array) {
+                                if (env->vars[i].string_array[env->vars[i].array_size - 1]) {
+                                    free(env->vars[i].string_array[env->vars[i].array_size - 1]);
+                                }
+                                env->vars[i].array_size--;
+                            } else {
+                                env->vars[i].array_size--;
+                            }
+                        }
+                    } else if (method == 2) {  // sortieren - sort
+                        if (env->vars[i].is_string_array) {
+                            // Sort string array
+                            for (int j = 0; j < env->vars[i].array_size - 1; j++) {
+                                for (int k = j + 1; k < env->vars[i].array_size; k++) {
+                                    if (strcmp(env->vars[i].string_array[j], env->vars[i].string_array[k]) > 0) {
+                                        char *temp = env->vars[i].string_array[j];
+                                        env->vars[i].string_array[j] = env->vars[i].string_array[k];
+                                        env->vars[i].string_array[k] = temp;
+                                    }
+                                }
+                            }
+                        } else {
+                            // Sort numeric array using bubble sort
+                            for (int j = 0; j < env->vars[i].array_size - 1; j++) {
+                                for (int k = j + 1; k < env->vars[i].array_size; k++) {
+                                    if (env->vars[i].array[j] > env->vars[i].array[k]) {
+                                        double temp = env->vars[i].array[j];
+                                        env->vars[i].array[j] = env->vars[i].array[k];
+                                        env->vars[i].array[k] = temp;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            
             return 0;
         }
         
