@@ -913,8 +913,10 @@ typedef struct {
     char string_value[256];
     int is_string;
     double *array;
+    char **string_array;  // For TEXT arrays
     int array_size;
     int is_array;
+    int is_string_array;  // 1 if array contains strings, 0 if numbers
 } Variable;
 
 typedef struct {
@@ -1008,6 +1010,39 @@ double env_get_array_element(Environment *env, const char *name, int index) {
     return 0;
 }
 
+char *env_get_string_array_element(Environment *env, const char *name, int index) {
+    for (int i = 0; i < env->var_count; i++) {
+        if (strcmp(env->vars[i].name, name) == 0 && env->vars[i].is_string_array) {
+            if (index >= 0 && index < env->vars[i].array_size) {
+                return env->vars[i].string_array[index];
+            }
+        }
+    }
+    return "";
+}
+
+void env_set_string_array(Environment *env, const char *name, char **array, int size) {
+    for (int i = 0; i < env->var_count; i++) {
+        if (strcmp(env->vars[i].name, name) == 0) {
+            env->vars[i].string_array = array;
+            env->vars[i].array_size = size;
+            env->vars[i].is_array = 1;
+            env->vars[i].is_string_array = 1;
+            env->vars[i].is_string = 0;
+            return;
+        }
+    }
+    if (env->var_count < MAX_VARS) {
+        strcpy(env->vars[env->var_count].name, name);
+        env->vars[env->var_count].string_array = array;
+        env->vars[env->var_count].array_size = size;
+        env->vars[env->var_count].is_array = 1;
+        env->vars[env->var_count].is_string_array = 1;
+        env->vars[env->var_count].is_string = 0;
+        env->var_count++;
+    }
+}
+
 double eval(ASTNode *node, Environment *env);
 
 double eval(ASTNode *node, Environment *env) {
@@ -1060,11 +1095,31 @@ double eval(ASTNode *node, Environment *env) {
             if (node->data.decl.value->type == NODE_ARRAY_INIT) {
                 // Handle array initialization
                 ASTNode *arr_init = node->data.decl.value;
-                double *array = malloc(sizeof(double) * arr_init->data.array_init.count);
-                for (int i = 0; i < arr_init->data.array_init.count; i++) {
-                    array[i] = eval(arr_init->data.array_init.elements[i], env);
+                
+                // Check if this is a TEXT array
+                if (node->data.decl.type == TOK_TEXT) {
+                    // String array
+                    char **string_array = malloc(sizeof(char*) * arr_init->data.array_init.count);
+                    for (int i = 0; i < arr_init->data.array_init.count; i++) {
+                        ASTNode *elem = arr_init->data.array_init.elements[i];
+                        if (elem->type == NODE_STRING) {
+                            string_array[i] = malloc(256);
+                            strcpy(string_array[i], elem->data.string.value);
+                        } else {
+                            // If not a string literal, try to convert
+                            string_array[i] = malloc(256);
+                            sprintf(string_array[i], "%.0f", eval(elem, env));
+                        }
+                    }
+                    env_set_string_array(env, node->data.decl.varname, string_array, arr_init->data.array_init.count);
+                } else {
+                    // Numeric array
+                    double *array = malloc(sizeof(double) * arr_init->data.array_init.count);
+                    for (int i = 0; i < arr_init->data.array_init.count; i++) {
+                        array[i] = eval(arr_init->data.array_init.elements[i], env);
+                    }
+                    env_set_array(env, node->data.decl.varname, array, arr_init->data.array_init.count);
                 }
-                env_set_array(env, node->data.decl.varname, array, arr_init->data.array_init.count);
             } else if (node->data.decl.value->type == NODE_STRING) {
                 // Handle string initialization
                 env_set_string(env, node->data.decl.varname, node->data.decl.value->data.string.value);
@@ -1078,6 +1133,14 @@ double eval(ASTNode *node, Environment *env) {
         
         case NODE_ARRAY_ACCESS: {
             int index = (int)eval(node->data.array_access.index, env);
+            // Check if this is a string array access
+            for (int i = 0; i < env->var_count; i++) {
+                if (strcmp(env->vars[i].name, node->data.array_access.name) == 0 && 
+                    env->vars[i].is_string_array) {
+                    // This will be handled in OUTPUT, return 0 for now
+                    return 0;
+                }
+            }
             return env_get_array_element(env, node->data.array_access.name, index);
         }
         
@@ -1091,6 +1154,22 @@ double eval(ASTNode *node, Environment *env) {
             ASTNode *expr = node->data.output.expr;
             if (expr->type == NODE_STRING) {
                 printf("%s\n", expr->data.string.value);
+            } else if (expr->type == NODE_ARRAY_ACCESS) {
+                // Handle array element access
+                int index = (int)eval(expr->data.array_access.index, env);
+                // Check if this is a string array
+                for (int i = 0; i < env->var_count; i++) {
+                    if (strcmp(env->vars[i].name, expr->data.array_access.name) == 0) {
+                        if (env->vars[i].is_string_array) {
+                            char *elem = env_get_string_array_element(env, expr->data.array_access.name, index);
+                            printf("%s\n", elem);
+                        } else {
+                            double val = env_get_array_element(env, expr->data.array_access.name, index);
+                            printf("%.0f\n", val);
+                        }
+                        return 0;
+                    }
+                }
             } else if (expr->type == NODE_VAR) {
                 // Check if it's a string variable
                 for (int i = 0; i < env->var_count; i++) {
