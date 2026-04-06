@@ -1,9 +1,0 @@
-1.
-flex sprach.l
-
-2.
-gcc lex.yy.c -o sprach
-
-3.
-Get-Content input.txt | .\sprach.exe
-Get-Content input.sprach | .\sprach.exe

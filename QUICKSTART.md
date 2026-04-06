@@ -2,47 +2,73 @@
 
 ## What is SPRACH?
 
-SPRACH is a German-inspired mini programming language with a complete compiler that demonstrates three phases of compilation:
-1. **Lexical Analysis** - Tokenization
-2. **Syntax Analysis** - Parsing
-3. **Semantic Analysis** - Type checking and validation
+SPRACH is a German-inspired mini programming language with a complete compiler that demonstrates five phases of compilation:
+1. **Lexical Analysis** - Tokenization (50+ token types)
+2. **Syntax Analysis** - Parsing (15 precedence levels)
+3. **Semantic Analysis** - Type checking and validation (symbol table)
+4. **Intermediate Code Generation** - Three-Address Code (TAC) with 30 operation types
+5. **Interpretation** - AST-based execution engine
 
 ## Quick Compilation
 
 ### Windows (Pre-compiled)
 Simply run:
 ```bash
-sprach_simple < input.sprach
+sprach < input.sprach
 ```
 
 ### Build from Source
 ```bash
-bison -d simple_sprach.y
-flex simple_sprach.l
-gcc -o sprach_simple simple_sprach.tab.c lex.yy.c
+gcc -o sprach sprach.c
 ```
 
-## Running the Compiler
-
-### Example 1: Basic Variable Declaration
+### Running the Compiler
 ```bash
-echo "GANZ x = 5;" | ./sprach_simple
+sprach < input.sprach
 ```
-Output: `Var with init`
+The compiler produces:
+- **TAC Output** to console showing three-address code
+- **TAC Output** to file (tac_output.txt) for documentation
+- **Result** - Program execution output
 
-### Example 2: Using Input File
-```bash
-./sprach_simple < input.sprach
+## What is TAC (Three-Address Code)?
+
+TAC is an **intermediate representation** of source code that bridges the gap between high-level programming and machine instructions. It breaks down complex expressions into simple, sequential operations where each instruction has at most three operands.
+
+### Why TAC?
+- **Clarity**: Shows exactly what the compiler does with each operation
+- **Optimization Ready**: Makes it easier to apply compiler optimizations
+- **Machine Generation**: Can be easily converted to assembly or machine code
+- **Debugging**: Helps understand program flow and transformations
+
+### TAC Example
+For the SPRACH program:
+```sprach
+GANZ a = 5;
+GANZ b = 3;
+GANZ c = a + b;
+geben c;
 ```
 
-### Example 3: Interactive Mode
-```bash
-./sprach_simple
-GANZ count = 10;
-[Ctrl+D to end input]
+The compiler generates this TAC:
+```
+TAC 1: LOAD_CONST _t0 = 5
+TAC 2: STORE_VAR a = _t0
+TAC 3: LOAD_CONST _t1 = 3
+TAC 4: STORE_VAR b = _t1
+TAC 5: LOAD_VAR _t2 = a
+TAC 6: LOAD_VAR _t3 = b
+TAC 7: ADD _t4 = _t2 + _t3
+TAC 8: STORE_VAR c = _t4
 ```
 
-## SPRACH Language Basics
+Notice how:
+- Temporary variables (`_t0`, `_t1`, etc.) store intermediate results
+- Each operation is atomic (one instruction)
+- Complex expressions are decomposed into steps
+- Variable loads and stores are explicit
+
+
 
 ### Variable Declaration
 ```sprach
@@ -134,35 +160,35 @@ names sortieren;
 
 ## Project Files
 
-- `simple_sprach.l` - Lexer specification
-- `simple_sprach.y` - Parser specification
-- `symbol_table.c/.h` - Symbol table for variable tracking
-- `semantic_analyzer.c/.h` - Type checking engine
+- `sprach.c` - Complete compiler (lexer, parser, semantic analyzer, TAC generator, interpreter)
 - `input.sprach` - Sample program
-- `README.md` - Detailed documentation
-- `IMPLEMENTATION.md` - Technical details
+- `README.md` - Comprehensive documentation
+- `QUICKSTART.md` - This file
 
 ## Further Reading
 
-See `README.md` for comprehensive language documentation.
-See `IMPLEMENTATION.md` for compiler architecture details.
+See `README.md` for comprehensive language documentation, TAC details, and compiler architecture.
 
 ## Test the Compiler
 
 ```bash
-# Run sample program
-./sprach_simple < input.sprach
+# Compile the compiler
+gcc -o sprach sprach.c
 
-# Try declaring a variable
-echo "GANZ myVar = 42;" | ./sprach_simple
+# Run sample program (shows TAC + output)
+sprach < input.sprach
 
-# Test mathematical function
-echo "KOMM result = quadrat_wurzel(16.0);" | ./sprach_simple
+# Try simple program
+echo "GANZ x = 10; KOMM y = 3.5; geben x + y;" | sprach
 ```
+
+The output will show:
+1. **TAC Instructions** - The intermediate code representation
+2. **Program Result** - The actual output from execution
 
 ## Success Indicators
 
-If you see output like `Var with init`, `Var declared`, or `OK`, the compilation was successful!
+The compiler successfully displays both the TAC (three-address code) intermediate representation and the program execution result. Check `tac_output.txt` for the complete TAC dump.
 
 ---
 
