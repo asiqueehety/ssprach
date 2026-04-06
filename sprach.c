@@ -1389,6 +1389,542 @@ double eval(ASTNode *node, Environment *env) {
     }
 }
 
+/* ============= INTERMEDIATE CODE GENERATION (TAC) ============= */
+
+typedef enum {
+    TAC_ADD, TAC_SUB, TAC_MUL, TAC_DIV, TAC_MOD, TAC_POW,
+    TAC_AND, TAC_OR, TAC_NOT, TAC_BITAND, TAC_BITOR,
+    TAC_LT, TAC_LE, TAC_GT, TAC_GE, TAC_EQ, TAC_NE,
+    TAC_LSHIFT, TAC_RSHIFT,
+    TAC_ASSIGN, TAC_LOAD_CONST, TAC_LOAD_VAR, TAC_STORE_VAR,
+    TAC_ARRAY_ACCESS, TAC_ARRAY_ASSIGN,
+    TAC_CALL, TAC_RETURN,
+    TAC_LABEL, TAC_GOTO, TAC_COND_GOTO,
+    TAC_PRINT, TAC_INPUT,
+    TAC_ARRAY_APPEND, TAC_ARRAY_REMOVE, TAC_ARRAY_SORT
+} TACOpType;
+
+typedef struct {
+    TACOpType op;
+    char arg1[256];
+    char arg2[256];
+    char result[256];
+    char label[256];
+} TACInstruction;
+
+typedef struct {
+    TACInstruction *instructions;
+    int count;
+    int capacity;
+} TACProgram;
+
+int temp_var_counter = 0;
+int label_counter = 0;
+
+TACProgram *tac_create() {
+    TACProgram *prog = malloc(sizeof(TACProgram));
+    prog->capacity = 10000;
+    prog->count = 0;
+    prog->instructions = malloc(sizeof(TACInstruction) * prog->capacity);
+    return prog;
+}
+
+char *tac_new_temp() {
+    static char temp[256];
+    sprintf(temp, "_t%d", temp_var_counter++);
+    return strdup(temp);
+}
+
+char *tac_new_label() {
+    static char label[256];
+    sprintf(label, "_L%d", label_counter++);
+    return strdup(label);
+}
+
+void tac_emit(TACProgram *prog, TACOpType op, const char *arg1, 
+              const char *arg2, const char *result) {
+    if (prog->count >= prog->capacity) {
+        prog->capacity *= 2;
+        prog->instructions = realloc(prog->instructions, 
+                                    sizeof(TACInstruction) * prog->capacity);
+    }
+    
+    TACInstruction *instr = &prog->instructions[prog->count++];
+    instr->op = op;
+    strcpy(instr->arg1, arg1 ? arg1 : "");
+    strcpy(instr->arg2, arg2 ? arg2 : "");
+    strcpy(instr->result, result ? result : "");
+    strcpy(instr->label, "");
+}
+
+void tac_emit_label(TACProgram *prog, const char *label) {
+    if (prog->count >= prog->capacity) {
+        prog->capacity *= 2;
+        prog->instructions = realloc(prog->instructions, 
+                                    sizeof(TACInstruction) * prog->capacity);
+    }
+    
+    TACInstruction *instr = &prog->instructions[prog->count++];
+    instr->op = TAC_LABEL;
+    strcpy(instr->label, label);
+    strcpy(instr->arg1, "");
+    strcpy(instr->arg2, "");
+    strcpy(instr->result, "");
+}
+
+char *generate_tac_expression(ASTNode *node, TACProgram *prog);
+void generate_tac_statement(ASTNode *node, TACProgram *prog);
+
+char *generate_tac_expression(ASTNode *node, TACProgram *prog) {
+    if (!node) return "";
+    
+    static char result[256];
+    char *temp;
+    char *left_var;
+    char *right_var;
+    
+    switch (node->type) {
+        case NODE_NUMBER: {
+            temp = tac_new_temp();
+            sprintf(result, "%.0f", node->data.number.value);
+            tac_emit(prog, TAC_LOAD_CONST, result, "", temp);
+            strcpy(result, temp);
+            return result;
+        }
+        
+        case NODE_STRING: {
+            temp = tac_new_temp();
+            tac_emit(prog, TAC_LOAD_CONST, node->data.string.value, "", temp);
+            strcpy(result, temp);
+            return result;
+        }
+        
+        case NODE_VAR: {
+            temp = tac_new_temp();
+            tac_emit(prog, TAC_LOAD_VAR, node->data.var.name, "", temp);
+            strcpy(result, temp);
+            return result;
+        }
+        
+        case NODE_BINOP: {
+            left_var = generate_tac_expression(node->data.binop.left, prog);
+            right_var = generate_tac_expression(node->data.binop.right, prog);
+            temp = tac_new_temp();
+            
+            TACOpType tac_op = TAC_ADD;
+            switch (node->data.binop.op) {
+                case '+': tac_op = TAC_ADD; break;
+                case '-': tac_op = TAC_SUB; break;
+                case '*': tac_op = TAC_MUL; break;
+                case '/': tac_op = TAC_DIV; break;
+                case '%': tac_op = TAC_MOD; break;
+                case '^': tac_op = TAC_POW; break;
+                case '&': tac_op = TAC_BITAND; break;
+                case '|': tac_op = TAC_BITOR; break;
+                case '<': tac_op = TAC_LT; break;
+                case '>': tac_op = TAC_GT; break;
+                case '=': tac_op = TAC_EQ; break;
+                case '!': tac_op = TAC_NE; break;
+            }
+            
+            tac_emit(prog, tac_op, left_var, right_var, temp);
+            strcpy(result, temp);
+            return result;
+        }
+        
+        case NODE_UNOP: {
+            char *operand_var = generate_tac_expression(node->data.unop.operand, prog);
+            temp = tac_new_temp();
+            
+            if (node->data.unop.op == '-') {
+                tac_emit(prog, TAC_SUB, "0", operand_var, temp);
+            } else if (node->data.unop.op == 'N') {
+                tac_emit(prog, TAC_NOT, operand_var, "", temp);
+            }
+            
+            strcpy(result, temp);
+            return result;
+        }
+        
+        case NODE_ARRAY_ACCESS: {
+            char *index_var = generate_tac_expression(node->data.array_access.index, prog);
+            temp = tac_new_temp();
+            
+            char arg[512];
+            sprintf(arg, "%s[%s]", node->data.array_access.name, index_var);
+            tac_emit(prog, TAC_ARRAY_ACCESS, arg, "", temp);
+            
+            strcpy(result, temp);
+            return result;
+        }
+        
+        case NODE_CALL: {
+            temp = tac_new_temp();
+            
+            char args_str[1024] = "";
+            for (int i = 0; i < node->data.call.arg_count; i++) {
+                char *arg_var = generate_tac_expression(node->data.call.args[i], prog);
+                strcat(args_str, arg_var);
+                if (i < node->data.call.arg_count - 1) strcat(args_str, ",");
+            }
+            
+            char call_str[512];
+            sprintf(call_str, "%s(%s)", node->data.call.name, args_str);
+            tac_emit(prog, TAC_CALL, call_str, "", temp);
+            
+            strcpy(result, temp);
+            return result;
+        }
+        
+        default:
+            strcpy(result, "0");
+            return result;
+    }
+}
+
+void generate_tac_statement(ASTNode *node, TACProgram *prog) {
+    if (!node) return;
+    
+    char *expr_var;
+    char *cond_var;
+    char *loop_start_label;
+    char *loop_end_label;
+    char *else_label;
+    char *endif_label;
+    
+    switch (node->type) {
+        case NODE_DECL: {
+            if (node->data.decl.value && node->data.decl.value->type != NODE_ARRAY_INIT) {
+                expr_var = generate_tac_expression(node->data.decl.value, prog);
+                tac_emit(prog, TAC_STORE_VAR, expr_var, "", node->data.decl.varname);
+            }
+            break;
+        }
+        
+        case NODE_ASSIGN: {
+            expr_var = generate_tac_expression(node->data.assign.value, prog);
+            tac_emit(prog, TAC_STORE_VAR, expr_var, "", node->data.assign.varname);
+            break;
+        }
+        
+        case NODE_OUTPUT: {
+            expr_var = generate_tac_expression(node->data.output.expr, prog);
+            tac_emit(prog, TAC_PRINT, expr_var, "", "");
+            break;
+        }
+        
+        case NODE_WHILE: {
+            loop_start_label = tac_new_label();
+            loop_end_label = tac_new_label();
+            
+            tac_emit_label(prog, loop_start_label);
+            
+            cond_var = generate_tac_expression(node->data.while_node.condition, prog);
+            tac_emit(prog, TAC_COND_GOTO, cond_var, "", loop_end_label);
+            
+            generate_tac_statement(node->data.while_node.body, prog);
+            tac_emit(prog, TAC_GOTO, "", "", loop_start_label);
+            
+            tac_emit_label(prog, loop_end_label);
+            break;
+        }
+        
+        case NODE_FOR: {
+            loop_start_label = tac_new_label();
+            loop_end_label = tac_new_label();
+            
+            if (node->data.for_node.init) {
+                generate_tac_statement(node->data.for_node.init, prog);
+            }
+            
+            tac_emit_label(prog, loop_start_label);
+            
+            cond_var = generate_tac_expression(node->data.for_node.condition, prog);
+            tac_emit(prog, TAC_COND_GOTO, cond_var, "", loop_end_label);
+            
+            generate_tac_statement(node->data.for_node.body, prog);
+            
+            if (node->data.for_node.increment) {
+                generate_tac_statement(node->data.for_node.increment, prog);
+            }
+            
+            tac_emit(prog, TAC_GOTO, "", "", loop_start_label);
+            
+            tac_emit_label(prog, loop_end_label);
+            break;
+        }
+        
+        case NODE_IF: {
+            else_label = tac_new_label();
+            endif_label = tac_new_label();
+            
+            cond_var = generate_tac_expression(node->data.if_node.condition, prog);
+            tac_emit(prog, TAC_COND_GOTO, cond_var, "", else_label);
+            
+            generate_tac_statement(node->data.if_node.body, prog);
+            tac_emit(prog, TAC_GOTO, "", "", endif_label);
+            
+            tac_emit_label(prog, else_label);
+            if (node->data.if_node.else_body) {
+                generate_tac_statement(node->data.if_node.else_body, prog);
+            }
+            
+            tac_emit_label(prog, endif_label);
+            break;
+        }
+        
+        case NODE_BLOCK: {
+            for (int i = 0; i < node->data.block.count; i++) {
+                generate_tac_statement(node->data.block.statements[i], prog);
+            }
+            break;
+        }
+        
+        case NODE_ARRAY_METHOD: {
+            if (node->data.array_method.method == 0) {
+                char *value_var = generate_tac_expression(node->data.array_method.arg, prog);
+                tac_emit(prog, TAC_ARRAY_APPEND, node->data.array_method.array_name, value_var, "");
+            } else if (node->data.array_method.method == 1) {
+                tac_emit(prog, TAC_ARRAY_REMOVE, node->data.array_method.array_name, "", "");
+            } else if (node->data.array_method.method == 2) {
+                tac_emit(prog, TAC_ARRAY_SORT, node->data.array_method.array_name, "", "");
+            }
+            break;
+        }
+        
+        default:
+            break;
+    }
+}
+
+void tac_print(TACProgram *prog) {
+    printf("\n========== INTERMEDIATE CODE (THREE-ADDRESS CODE) ==========\n\n");
+    
+    for (int i = 0; i < prog->count; i++) {
+        TACInstruction *instr = &prog->instructions[i];
+        
+        printf("[%3d] ", i);
+        
+        switch (instr->op) {
+            case TAC_ADD:
+                printf("%s = %s + %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_SUB:
+                printf("%s = %s - %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_MUL:
+                printf("%s = %s * %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_DIV:
+                printf("%s = %s / %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_MOD:
+                printf("%s = %s %% %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_POW:
+                printf("%s = %s ^ %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_LT:
+                printf("%s = %s < %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_LE:
+                printf("%s = %s <= %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_GT:
+                printf("%s = %s > %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_GE:
+                printf("%s = %s >= %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_EQ:
+                printf("%s = %s == %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_NE:
+                printf("%s = %s != %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_BITAND:
+                printf("%s = %s & %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_BITOR:
+                printf("%s = %s | %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_LSHIFT:
+                printf("%s = %s << %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_RSHIFT:
+                printf("%s = %s >> %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_AND:
+                printf("%s = %s AND %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_OR:
+                printf("%s = %s OR %s", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_NOT:
+                printf("%s = NOT %s", instr->result, instr->arg1);
+                break;
+            case TAC_LOAD_CONST:
+                printf("%s = CONST %s", instr->result, instr->arg1);
+                break;
+            case TAC_LOAD_VAR:
+                printf("%s = LOAD %s", instr->result, instr->arg1);
+                break;
+            case TAC_STORE_VAR:
+                printf("STORE %s = %s", instr->result, instr->arg1);
+                break;
+            case TAC_ARRAY_ACCESS:
+                printf("%s = %s", instr->result, instr->arg1);
+                break;
+            case TAC_CALL:
+                printf("%s = CALL %s", instr->result, instr->arg1);
+                break;
+            case TAC_PRINT:
+                printf("PRINT %s", instr->arg1);
+                break;
+            case TAC_LABEL:
+                printf("%s:", instr->label);
+                break;
+            case TAC_GOTO:
+                printf("GOTO %s", instr->label);
+                break;
+            case TAC_COND_GOTO:
+                printf("IF %s GOTO %s", instr->arg1, instr->label);
+                break;
+            case TAC_ARRAY_APPEND:
+                printf("APPEND %s <- %s", instr->arg1, instr->arg2);
+                break;
+            case TAC_ARRAY_REMOVE:
+                printf("REMOVE %s", instr->arg1);
+                break;
+            case TAC_ARRAY_SORT:
+                printf("SORT %s", instr->arg1);
+                break;
+            default:
+                printf("UNKNOWN");
+                break;
+        }
+        
+        printf("\n");
+    }
+    
+    printf("\n===========================================================\n\n");
+}
+
+void tac_save_to_file(TACProgram *prog, const char *filename) {
+    FILE *f = fopen(filename, "w");
+    if (!f) return;
+    
+    fprintf(f, "INTERMEDIATE CODE (THREE-ADDRESS CODE)\n");
+    fprintf(f, "=====================================\n\n");
+    
+    for (int i = 0; i < prog->count; i++) {
+        TACInstruction *instr = &prog->instructions[i];
+        
+        fprintf(f, "[%3d] ", i);
+        
+        switch (instr->op) {
+            case TAC_ADD:
+                fprintf(f, "%s = %s + %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_SUB:
+                fprintf(f, "%s = %s - %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_MUL:
+                fprintf(f, "%s = %s * %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_DIV:
+                fprintf(f, "%s = %s / %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_MOD:
+                fprintf(f, "%s = %s %% %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_POW:
+                fprintf(f, "%s = %s ^ %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_LT:
+                fprintf(f, "%s = %s < %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_LE:
+                fprintf(f, "%s = %s <= %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_GT:
+                fprintf(f, "%s = %s > %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_GE:
+                fprintf(f, "%s = %s >= %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_EQ:
+                fprintf(f, "%s = %s == %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_NE:
+                fprintf(f, "%s = %s != %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_BITAND:
+                fprintf(f, "%s = %s & %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_BITOR:
+                fprintf(f, "%s = %s | %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_LSHIFT:
+                fprintf(f, "%s = %s << %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_RSHIFT:
+                fprintf(f, "%s = %s >> %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_AND:
+                fprintf(f, "%s = %s AND %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_OR:
+                fprintf(f, "%s = %s OR %s\n", instr->result, instr->arg1, instr->arg2);
+                break;
+            case TAC_NOT:
+                fprintf(f, "%s = NOT %s\n", instr->result, instr->arg1);
+                break;
+            case TAC_LOAD_CONST:
+                fprintf(f, "%s = CONST %s\n", instr->result, instr->arg1);
+                break;
+            case TAC_LOAD_VAR:
+                fprintf(f, "%s = LOAD %s\n", instr->result, instr->arg1);
+                break;
+            case TAC_STORE_VAR:
+                fprintf(f, "STORE %s = %s\n", instr->result, instr->arg1);
+                break;
+            case TAC_ARRAY_ACCESS:
+                fprintf(f, "%s = %s\n", instr->result, instr->arg1);
+                break;
+            case TAC_CALL:
+                fprintf(f, "%s = CALL %s\n", instr->result, instr->arg1);
+                break;
+            case TAC_PRINT:
+                fprintf(f, "PRINT %s\n", instr->arg1);
+                break;
+            case TAC_LABEL:
+                fprintf(f, "%s:\n", instr->label);
+                break;
+            case TAC_GOTO:
+                fprintf(f, "GOTO %s\n", instr->label);
+                break;
+            case TAC_COND_GOTO:
+                fprintf(f, "IF %s GOTO %s\n", instr->arg1, instr->label);
+                break;
+            case TAC_ARRAY_APPEND:
+                fprintf(f, "APPEND %s <- %s\n", instr->arg1, instr->arg2);
+                break;
+            case TAC_ARRAY_REMOVE:
+                fprintf(f, "REMOVE %s\n", instr->arg1);
+                break;
+            case TAC_ARRAY_SORT:
+                fprintf(f, "SORT %s\n", instr->arg1);
+                break;
+            default:
+                fprintf(f, "UNKNOWN\n");
+                break;
+        }
+    }
+    
+    fclose(f);
+}
+
 int main() {
     char input[100000];
     int len = 0;
@@ -1411,6 +1947,17 @@ int main() {
         }
     }
     
+    // Generate intermediate code
+    TACProgram *tac_prog = tac_create();
+    generate_tac_statement(program, tac_prog);
+    
+    // Print TAC to console
+    tac_print(tac_prog);
+    
+    // Save TAC to file
+    tac_save_to_file(tac_prog, "tac_output.txt");
+    
+    // Execute the program (original AST interpretation)
     Environment *env = env_create();
     eval(program, env);
     

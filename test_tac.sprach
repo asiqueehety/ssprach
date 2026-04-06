@@ -1,0 +1,18 @@
+## Simple test for TAC generation
+GANZ x = 5;
+GANZ y = 3;
+GANZ z = x + y * 2;
+geben z;
+
+## Array test
+GANZ arr[] = {10, 20, 30};
+arr hinzufuegen 40;
+geben arr[0];
+geben arr[3];
+
+## If statement
+wenn (z > 10) {
+    geben 999;
+} sonst {
+    geben 111;
+}

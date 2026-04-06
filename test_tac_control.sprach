@@ -1,0 +1,14 @@
+## Test TAC with loops and conditionals
+GANZ sum = 0;
+fuer (i = 1; i <= 5; i = i + 1) {
+    sum = sum + i;
+}
+geben sum;
+
+## If-else TAC generation
+GANZ x = 15;
+wenn (x > 10) {
+    geben 100;
+} sonst {
+    geben 50;
+}
