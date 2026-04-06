@@ -1,4 +1,0 @@
-GANZ a = 5;
-GANZ b = 3;
-GANZ c = a + b;
-geben c;
