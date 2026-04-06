@@ -3,6 +3,19 @@
 # Tests all language features
 # ============================================================
 
+# ============================================================
+# 1. DATA TYPES & VARIABLES
+# ============================================================
+geben 999;  # Marker: Start of test
+GANZ intVar = 42;
+KOMM doubleVar = 3.14159;
+TEXT stringVar = "Hello SPRACH";
+ZEICHEN charVar = 'X';
+
+geben intVar;
+geben doubleVar;
+geben stringVar;
+geben charVar;
 
 # ============================================================
 # 2. ARITHMETIC OPERATIONS
