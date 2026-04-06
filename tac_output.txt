@@ -1,7 +1,26 @@
 INTERMEDIATE CODE (THREE-ADDRESS CODE)
 =====================================
 
-[  0] _t0 = CONST 10
-[  1] STORE x = _t0
-[  2] _t1 = LOAD x
-[  3] PRINT _t1
+[  0] _t0 = CONST 1
+[  1] STORE factorial = _t0
+[  2] _t1 = CONST 5
+[  3] STORE fact_n = _t1
+[  4] _t2 = CONST 1
+[  5] STORE fact_i = _t2
+[  6] _L0:
+[  7] _t3 = LOAD fact_i
+[  8] _t4 = LOAD fact_n
+[  9] _t5 = _t4 + _t4
+[ 10] IF _t5 GOTO 
+[ 11] _t6 = LOAD factorial
+[ 12] _t7 = LOAD fact_i
+[ 13] _t8 = _t7 * _t7
+[ 14] STORE factorial = _t8
+[ 15] _t9 = LOAD fact_i
+[ 16] _t10 = CONST 1
+[ 17] _t11 = _t10 + _t10
+[ 18] STORE fact_i = _t11
+[ 19] GOTO 
+[ 20] _L1:
+[ 21] _t12 = LOAD factorial
+[ 22] PRINT _t12

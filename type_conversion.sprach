@@ -1,0 +1,7 @@
+# ============================================================
+# 22. TYPE CONVERSION TESTS
+# ============================================================
+GANZ intVal = 10;
+KOMM doubleVal = 3.5;
+geben intVal + doubleVal;       # 13.5 (int + double)
+geben doubleVal * 2;           # 7.0

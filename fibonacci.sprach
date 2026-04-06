@@ -1,0 +1,14 @@
+# ============================================================
+# 16. FIBONACCI SEQUENCE (10 numbers)
+# ============================================================
+GANZ fib_a = 0;
+GANZ fib_b = 1;
+GANZ fib_count = 0;
+
+waehrend (fib_count < 10) {
+    geben fib_a;                # Should print: 0 1 1 2 3 5 8 13 21 34
+    GANZ fib_temp = fib_a + fib_b;
+    fib_a = fib_b;
+    fib_b = fib_temp;
+    fib_count = fib_count + 1;
+}
