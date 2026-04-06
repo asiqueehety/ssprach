@@ -1,0 +1,28 @@
+## Comprehensive TAC Test - All Features
+
+# Test 1: Simple arithmetic
+GANZ a = 5;
+GANZ b = 3;
+GANZ c = a + b * 2;
+geben c;
+
+# Test 2: Array operations with TAC
+GANZ numbers[] = {3, 1, 4, 1, 5};
+numbers sortieren;
+geben numbers[0];
+geben numbers[1];
+geben numbers[2];
+
+# Test 3: String array sort
+TEXT words[] = {"Zebra", "Apple", "Mango"};
+words sortieren;
+geben words[0];
+geben words[1];
+geben words[2];
+
+# Test 4: Logical operations
+GANZ x = 10;
+GANZ y = 20;
+wenn (x < y und y > 15) {
+    geben 777;
+}
