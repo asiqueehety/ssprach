@@ -1,0 +1,14 @@
+# ============================================================
+# 19. FIND MAXIMUM IN ARRAY
+# ============================================================
+GANZ values[] = {3, 7, 2, 9, 1, 5};
+GANZ max_val = values[0];
+GANZ max_idx = 1;
+
+waehrend (max_idx < 6) {
+    wenn (values[max_idx] > max_val) {
+        max_val = values[max_idx];
+    }
+    max_idx = max_idx + 1;
+}
+geben max_val;                  # 9

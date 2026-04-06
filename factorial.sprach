@@ -1,0 +1,10 @@
+
+# ============================================================
+# 17. FACTORIAL CALCULATION (5!)
+# ============================================================
+GANZ factorial = 1;
+GANZ fact_n = 5;
+fuer (fact_i = 1; fact_i <= fact_n; fact_i = fact_i + 1) {
+    factorial = factorial * fact_i;
+}
+geben factorial;                # 120

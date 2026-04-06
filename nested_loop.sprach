@@ -1,0 +1,10 @@
+# ============================================================
+# 20. NESTED LOOPS WITH CONDITIONS
+# ============================================================
+GANZ a = 0;
+fuer (outer = 1; outer <= 3; outer = outer + 1) {
+    fuer (inner = 1; inner <= 3; inner = inner + 1) {
+        a = a + 1;
+    }
+}
+geben a;

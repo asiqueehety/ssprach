@@ -1,0 +1,12 @@
+# ============================================================
+# 18. SUM OF ARRAY
+# ============================================================
+GANZ array[] = {5, 10, 15, 20, 25};
+GANZ array_sum = 0;
+GANZ array_idx = 0;
+
+waehrend (array_idx < 5) {
+    array_sum = array_sum + array[array_idx];
+    array_idx = array_idx + 1;
+}
+geben array_sum;                # 75

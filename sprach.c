@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <stdarg.h>
 
 /* ============= LEXER ============= */
 
@@ -941,6 +942,53 @@ ASTNode *parser_parse_statement(Parser *parser) {
     return NULL;
 }
 
+/* ============= ERROR HANDLING ============= */
+
+typedef struct {
+    int error_count;
+    char error_messages[100][512];
+    int runtime_error;
+    char last_error[512];
+} ErrorHandler;
+
+ErrorHandler *error_handler = NULL;
+
+ErrorHandler *error_handler_create() {
+    ErrorHandler *eh = malloc(sizeof(ErrorHandler));
+    eh->error_count = 0;
+    eh->runtime_error = 0;
+    memset(eh->last_error, 0, 512);
+    return eh;
+}
+
+void error_report(const char *format, ...) {
+    if (!error_handler) return;
+    
+    va_list args;
+    va_start(args, format);
+    vsnprintf(error_handler->last_error, 512, format, args);
+    va_end(args);
+    
+    if (error_handler->error_count < 100) {
+        strcpy(error_handler->error_messages[error_handler->error_count], error_handler->last_error);
+        error_handler->error_count++;
+    }
+    
+    fprintf(stderr, "[ERROR] %s\n", error_handler->last_error);
+    error_handler->runtime_error = 1;
+}
+
+int has_error() {
+    return error_handler && error_handler->runtime_error;
+}
+
+void clear_error() {
+    if (error_handler) {
+        error_handler->runtime_error = 0;
+        memset(error_handler->last_error, 0, 512);
+    }
+}
+
 /* ============= INTERPRETER ============= */
 
 #define MAX_VARS 1000
@@ -1082,6 +1130,35 @@ void env_set_string_array(Environment *env, const char *name, char **array, int 
     }
 }
 
+/* ============= TYPE CHECKING HELPERS ============= */
+
+int is_string_variable(Environment *env, const char *varname) {
+    for (int i = 0; i < env->var_count; i++) {
+        if (strcmp(env->vars[i].name, varname) == 0) {
+            return env->vars[i].is_string;
+        }
+    }
+    return 0;
+}
+
+int is_array_variable(Environment *env, const char *varname) {
+    for (int i = 0; i < env->var_count; i++) {
+        if (strcmp(env->vars[i].name, varname) == 0) {
+            return env->vars[i].is_array;
+        }
+    }
+    return 0;
+}
+
+int variable_exists(Environment *env, const char *varname) {
+    for (int i = 0; i < env->var_count; i++) {
+        if (strcmp(env->vars[i].name, varname) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 double eval(ASTNode *node, Environment *env);
 
 double eval(ASTNode *node, Environment *env) {
@@ -1095,17 +1172,37 @@ double eval(ASTNode *node, Environment *env) {
             return 0;  // Strings don't have numeric value
         
         case NODE_VAR:
+            if (!variable_exists(env, node->data.var.name)) {
+                error_report("Undefined variable: '%s'", node->data.var.name);
+                return 0;
+            }
             return env_get(env, node->data.var.name);
         
         case NODE_BINOP: {
             double left = eval(node->data.binop.left, env);
             double right = eval(node->data.binop.right, env);
+            
+            // Check for error from operand evaluation
+            if (has_error()) {
+                return 0;
+            }
+            
             switch (node->data.binop.op) {
                 case '+': return left + right;
                 case '-': return left - right;
                 case '*': return left * right;
-                case '/': return (right != 0) ? left / right : 0;
-                case '%': return (int)left % (int)right;
+                case '/': 
+                    if (right == 0) {
+                        error_report("Division by zero error");
+                        return 0;
+                    }
+                    return left / right;
+                case '%': 
+                    if ((int)right == 0) {
+                        error_report("Modulo by zero error");
+                        return 0;
+                    }
+                    return (int)left % (int)right;
                 case '^': return pow(left, right);
                 case '&': return (int)left & (int)right;
                 case '|': return (int)left | (int)right;
@@ -1171,15 +1268,34 @@ double eval(ASTNode *node, Environment *env) {
         }
         
         case NODE_ARRAY_ACCESS: {
+            // Check if array exists
+            if (!variable_exists(env, node->data.array_access.name)) {
+                error_report("Undefined array: '%s'", node->data.array_access.name);
+                return 0;
+            }
+            
             int index = (int)eval(node->data.array_access.index, env);
-            // Check if this is a string array access
+            
+            if (has_error()) {
+                return 0;
+            }
+            
+            // Check bounds
             for (int i = 0; i < env->var_count; i++) {
-                if (strcmp(env->vars[i].name, node->data.array_access.name) == 0 && 
-                    env->vars[i].is_string_array) {
-                    // This will be handled in OUTPUT, return 0 for now
-                    return 0;
+                if (strcmp(env->vars[i].name, node->data.array_access.name) == 0) {
+                    if (index < 0 || index >= env->vars[i].array_size) {
+                        error_report("Array index out of bounds: %s[%d] (size=%d)", 
+                                   node->data.array_access.name, index, env->vars[i].array_size);
+                        return 0;
+                    }
+                    
+                    if (env->vars[i].is_string_array) {
+                        return 0;  // String arrays handled elsewhere
+                    }
+                    break;
                 }
             }
+            
             return env_get_array_element(env, node->data.array_access.name, index);
         }
         
@@ -1283,28 +1399,39 @@ double eval(ASTNode *node, Environment *env) {
             if (strcmp(node->data.call.name, "quadrat_wurzel") == 0) {
                 if (node->data.call.arg_count > 0) {
                     double arg = eval(node->data.call.args[0], env);
+                    if (arg < 0) {
+                        error_report("Math domain error: quadrat_wurzel() of negative number (%.2f)", arg);
+                        return 0;
+                    }
                     return sqrt(arg);
                 }
             } else if (strcmp(node->data.call.name, "mathe_sin") == 0) {
                 if (node->data.call.arg_count > 0) {
                     double arg = eval(node->data.call.args[0], env);
-                    return sin(arg * 3.14159265359 / 180.0);  // Convert degrees to radians
+                    return sin(arg * 3.14159265359 / 180.0);
                 }
             } else if (strcmp(node->data.call.name, "mathe_cos") == 0) {
                 if (node->data.call.arg_count > 0) {
                     double arg = eval(node->data.call.args[0], env);
-                    return cos(arg * 3.14159265359 / 180.0);  // Convert degrees to radians
+                    return cos(arg * 3.14159265359 / 180.0);
                 }
             } else if (strcmp(node->data.call.name, "mathe_tan") == 0) {
                 if (node->data.call.arg_count > 0) {
                     double arg = eval(node->data.call.args[0], env);
-                    return tan(arg * 3.14159265359 / 180.0);  // Convert degrees to radians
+                    return tan(arg * 3.14159265359 / 180.0);
                 }
             } else if (strcmp(node->data.call.name, "mathe_log") == 0) {
                 if (node->data.call.arg_count > 0) {
                     double arg = eval(node->data.call.args[0], env);
+                    if (arg <= 0) {
+                        error_report("Math domain error: mathe_log() of non-positive number (%.2f)", arg);
+                        return 0;
+                    }
                     return log(arg);
                 }
+            } else {
+                error_report("Undefined function: '%s'", node->data.call.name);
+                return 0;
             }
             return 0;
         }
@@ -1926,6 +2053,9 @@ void tac_save_to_file(TACProgram *prog, const char *filename) {
 }
 
 int main() {
+    // Initialize error handler
+    error_handler = error_handler_create();
+    
     char input[100000];
     int len = 0;
     
@@ -1960,6 +2090,11 @@ int main() {
     // Execute the program (original AST interpretation)
     Environment *env = env_create();
     eval(program, env);
+    
+    // Print error summary if any errors occurred
+    if (error_handler->error_count > 0) {
+        fprintf(stderr, "\n[ERROR SUMMARY] %d error(s) encountered during execution\n", error_handler->error_count);
+    }
     
     return 0;
 }
