@@ -1,0 +1,303 @@
+# ============================================================
+# ERROR CASE TESTING SUITE FOR SPRACH COMPILER
+# Tests edge cases, invalid operations, type mismatches, etc.
+# ============================================================
+
+geben 9999;  # Marker: Start of error testing
+
+# ============================================================
+# 1. TYPE MISMATCH ERRORS
+# ============================================================
+
+# Error: Comparing number with string
+geben (5 > "string");
+
+# Error: Adding number to string
+geben (10 + "hello");
+
+# Error: String arithmetic
+geben ("abc" - "def");
+
+# Error: String multiplication
+geben ("test" * 3);
+
+# ============================================================
+# 2. UNDEFINED VARIABLE ERRORS
+# ============================================================
+
+# Error: Using undefined variable
+geben undefined_var;
+
+# Error: Undefined in expression
+geben undefined_x + 5;
+
+# Error: Undefined in array access
+geben undefined_array[0];
+
+# ============================================================
+# 3. ARRAY BOUNDARY ERRORS
+# ============================================================
+
+GANZ numbers[] = {10, 20, 30};
+
+# Error: Access out of bounds (negative index)
+geben numbers[-1];
+
+# Error: Access out of bounds (too large index)
+geben numbers[100];
+
+# Error: Access non-existent array element
+geben numbers[999];
+
+# ============================================================
+# 4. INVALID ARRAY OPERATIONS
+# ============================================================
+
+# Error: Remove from empty array (after removing all)
+GANZ smallArray[] = {1};
+smallArray entfernen;
+smallArray entfernen;  # Second remove - array already empty
+geben smallArray[0];
+
+# Error: Access array after removal
+TEXT words[] = {"Hello", "World"};
+words entfernen;
+geben words[0];  # Should be empty or cause error
+
+# ============================================================
+# 5. DIVISION BY ZERO
+# ============================================================
+
+# Error: Direct division by zero
+geben 10 / 0;
+
+# Error: Division by zero in expression
+geben 5 + (20 / 0);
+
+# Error: Modulo by zero
+geben 17 % 0;
+
+# ============================================================
+# 6. INVALID ARITHMETIC
+# ============================================================
+
+# Error: Power with invalid operands
+geben "text" ^ 2;
+
+# Error: Bitwise operations on strings
+geben ("hello" & "world");
+
+# Error: Left shift on string
+geben "abc" << 2;
+
+# ============================================================
+# 7. LOGICAL OPERATOR ERRORS
+# ============================================================
+
+# Error: Logical AND with string
+geben ("true" und 1);
+
+# Error: Logical OR with invalid types
+geben (5 oder "false");
+
+# Error: NOT on string
+geben (niet "hello");  # Note: Using 'niet' as invalid keyword test
+
+# ============================================================
+# 8. COMPARISON ERRORS
+# ============================================================
+
+# Error: Comparing string with number
+geben ("5" > 10);
+
+# Error: String comparison with operators
+geben ("abc" < 123);
+
+# Error: Array comparison (not supported)
+geben (numbers == smallArray);
+
+# ============================================================
+# 9. INVALID VARIABLE ASSIGNMENT
+# ============================================================
+
+# Error: Assign to undefined variable directly
+unknown_var = 42;
+
+# Error: Type mismatch in assignment (if strict typing)
+GANZ intVar = "not a number";
+
+# Error: Array to scalar variable
+GANZ x = numbers;
+
+# ============================================================
+# 10. CONTROL FLOW ERRORS
+# ============================================================
+
+# Error: Invalid loop condition (string)
+fuer (i = 0; i < "five"; i = i + 1) {
+    geben i;
+}
+
+# Error: While loop with string condition
+waehrend ("running") {
+    geben 1;
+}
+
+# Error: If with non-boolean condition (string)
+wenn ("yes") {
+    geben 100;
+}
+
+# ============================================================
+# 11. FUNCTION CALL ERRORS
+# ============================================================
+
+# Error: Function with wrong argument type
+geben quadrat_wurzel("negative");
+
+# Error: Function with invalid argument
+geben mathe_sin("not_a_number");
+
+# Error: Undefined function call
+geben unknown_function(5);
+
+# Error: Function with too many arguments
+geben quadrat_wurzel(16, 2);  # sqrt only takes 1 arg
+
+# ============================================================
+# 12. NESTED STRUCTURE ERRORS
+# ============================================================
+
+# Error: Array within array declaration (not supported)
+# GANZ matrix[][] = {{1, 2}, {3, 4}};
+
+# Error: Deeply nested undefined variable
+wenn (1 == 1) {
+    waehrend (x < 10) {  # Error: x undefined
+        geben x;
+        x = x + 1;
+    }
+}
+
+# ============================================================
+# 13. SWITCH/CASE ERRORS
+# ============================================================
+
+GANZ choice = 5;
+
+# Error: Switch on string (type mismatch)
+wahl ("option") {
+    fall 1: geben 100;
+    fall 2: geben 200;
+    standard: geben 0;
+}
+
+# Error: Invalid case value
+wahl (choice) {
+    fall "one": geben 1;  # Should be number
+    fall 2: geben 2;
+    standard: geben 0;
+}
+
+# ============================================================
+# 14. OPERATOR PRECEDENCE EDGE CASES
+# ============================================================
+
+# Error: Complex expression with type mismatch
+geben (5 + "3") * 2;
+
+# Error: Precedence with undefined variable
+geben 2 * undefined + 3;
+
+# Error: Mixed types in bitwise operations
+geben (5 & "3");
+
+# ============================================================
+# 15. MEMORY/RESOURCE ERRORS
+# ============================================================
+
+# Error: Creating very large array (stress test)
+# GANZ huge[] = {1, 2, 3, ... /* millions of elements */};
+
+# Error: Recursive pattern (if supported)
+# This would depend on your implementation
+
+# ============================================================
+# 16. STRING-SPECIFIC ERRORS
+# ============================================================
+
+TEXT str = "hello";
+
+# Error: String index access (not supported)
+geben str[0];  # Treating string as array
+
+# Error: String operations not supported
+geben str + 5;
+
+# Error: String comparison edge case
+geben ("" == 0);  # Empty string vs zero
+
+# ============================================================
+# 17. CHARACTER-SPECIFIC ERRORS
+# ============================================================
+
+ZEICHEN ch = 'A';
+
+# Error: Character arithmetic
+geben ch + 1;
+
+# Error: Invalid character literal
+geben 'ABC';  # Multiple characters
+
+# ============================================================
+# 18. MATH FUNCTION EDGE CASES
+# ============================================================
+
+# Error: Square root of negative (math domain error)
+geben quadrat_wurzel(-4);
+
+# Error: Log of zero (undefined)
+geben mathe_log(0);
+
+# Error: Log of negative
+geben mathe_log(-5);
+
+# Error: Invalid math operations
+geben quadrat_wurzel("text");
+
+# ============================================================
+# 19. EMPTY/NULL CASES
+# ============================================================
+
+# Error: Empty statement (might be caught during parsing)
+# ;
+
+# Error: Empty block
+wenn (1 == 1) {
+}
+
+# Error: Uninitialized variable
+GANZ uninitialized;
+geben uninitialized;
+
+# ============================================================
+# 20. SYNTAX-LEVEL ERRORS (will likely fail parsing)
+# ============================================================
+
+# Error: Missing semicolon (caught by parser)
+# geben 5
+
+# Error: Mismatched braces
+# wenn (1 == 1) { geben 1; 
+
+# Error: Invalid operator
+# geben 5 ++ 3;
+
+# Error: Invalid token
+# geben 5 @@ 3;
+
+# ============================================================
+# CONCLUSION MARKER
+# ============================================================
+
+geben 8888;  # Marker: End of error testing
