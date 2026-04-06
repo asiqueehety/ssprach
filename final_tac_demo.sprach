@@ -1,0 +1,7 @@
+## Final TAC Showcase
+GANZ arr[] = {5, 2, 8, 1};
+arr sortieren;
+geben arr[0];
+geben arr[1];
+geben arr[2];
+geben arr[3];
